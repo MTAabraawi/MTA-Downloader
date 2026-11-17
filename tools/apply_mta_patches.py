@@ -465,3 +465,17 @@ s = s.replace("""            qualities = qualities,
 """, """            qualities = qualities
 """, 1)
 p.write_text(s)
+
+
+# Apply the same browser-tab reset to the navigation rail as well as the bottom bar.
+p = root / "app/src/main/java/com/example/MainActivity.kt"
+s = p.read_text()
+old_tab = "onClick = { navigateTopLevel(BrowserRoute()) },"
+new_tab = """onClick = {
+                                if (!isBrowserSelected) {
+                                    viewModel.showBrowserSitesHome()
+                                    navigateTopLevel(BrowserRoute())
+                                }
+                            },"""
+if old_tab in s:
+    p.write_text(s.replace(old_tab, new_tab, 1))
