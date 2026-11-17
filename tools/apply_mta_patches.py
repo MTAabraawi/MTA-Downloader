@@ -598,7 +598,7 @@ p.write_text(s)
 p = root / "app/src/main/java/com/example/ui/screens/BrowserScreen.kt"
 s = p.read_text()
 s = s.replace("import android.webkit.WebSettings\n", "import android.webkit.WebSettings\nimport android.webkit.SslErrorHandler\nimport android.os.Build\n")
-s = s.replace("import androidx.compose.runtime.Composable\n", "import androidx.compose.runtime.Composable\nimport androidx.compose.runtime.DisposableEffect\nimport androidx.compose.runtime.onDispose\n")
+s = s.replace("import androidx.compose.runtime.Composable\n", "import androidx.compose.runtime.Composable\nimport androidx.compose.runtime.DisposableEffect\n")
 s = s.replace('''    var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
     Box(
