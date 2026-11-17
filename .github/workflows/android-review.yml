@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/android-review.yml'
+      - 'tools/apply_mta_patches.py'
 
 permissions:
   contents: write
