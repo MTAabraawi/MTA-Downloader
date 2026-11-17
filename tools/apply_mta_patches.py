@@ -646,3 +646,33 @@ edit("app/src/main/java/com/example/MainActivity.kt", """                viewMod
 """, """                viewModel.dismissSmartBrowserFallback()
                 navigateTopLevel(BrowserRoute(initialUrl = url))
 """, "avoid duplicate fallback load")
+
+
+remove_block("app/src/main/java/com/example/MainActivity.kt", "                                onOpenSettingsClick = viewModel::openSettingsDialog\n", "home screen server settings action")
+
+edit("app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt", """            // Layer 2: If a custom Cobalt / yt-dlp extraction backend API is configured, query it first
+            val backendEndpoint = getExtractorEndpoint()
+            if (backendEndpoint.isNotBlank()) {
+                queryBackendExtractorApi(backendEndpoint, normalizedUrl, platform, customTitle)?.let { apiItem ->
+                    return@withContext MediaExtractionResult.Success(apiItem)
+                }
+            }
+
+            // Layer 3: On-device HTML / OpenGraph / JSON-LD / <video> stream scraping
+            scrapeHtmlForMedia(normalizedUrl, platform, customTitle)?.let { scrapedItem ->
+                return@withContext MediaExtractionResult.Success(scrapedItem)
+            }
+
+            // Layer 4: Protected / JS-heavy page -> recommend opening in built-in Smart Browser sniffer
+            val reason = if (backendEndpoint.isBlank()) {
+                "تستخدم منصة $platform حماية أو مشغل JavaScript ديناميكي. يمكنك فتح الرابط في المتصفح الذكي لالتقاط بث الفيديو أثناء التشغيل، أو إضافة رابط خادم استخراج (yt-dlp / Cobalt) في الإعدادات."
+            } else {
+                "لم يتم العثور على رابط مباشر عبر خادم الاستخراج. افتح الصفحة في المتصفح الذكي لالتقاط بث الفيديو أثناء تشغيله."
+            }
+""", """            // Layer 2: Inspect public metadata and direct media URLs locally. No external extractor server is used.
+            scrapeHtmlForMedia(normalizedUrl, platform, customTitle)?.let { scrapedItem ->
+                return@withContext MediaExtractionResult.Success(scrapedItem)
+            }
+
+            val reason = "لم يعثر المحرك المحلي على رابط وسائط مباشر قابل للتنزيل من $platform. افتح الصفحة في المتصفح الداخلي وشغّل المحتوى العام؛ سيظهر خيار التحميل عند التقاط رابط مباشر مدعوم. قد تمنع المنصة تنزيل بعض المقاطع أو تتطلب استخدام ميزات التنزيل الرسمية."
+""", "remove external backend extraction layer")
