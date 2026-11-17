@@ -112,7 +112,7 @@ new = r'''    fun extractFirstUrlFromSharedText(rawText: String): String? {
                 if (it.startsWith("www.", true)) "https://$it" else "https://$it"
             }
             ?: return null
-        val cleaned = candidate.trim().trimEnd('.', ',', ';', ':', '!', '?', ')', ']', '}', '،', '؛', '"', '\\'')
+        val cleaned = candidate.trim().trimEnd('.', ',', ';', ':', '!', '?', ')', ']', '}', '،', '؛', '"')
         return runCatching {
             val uri = java.net.URI(cleaned)
             val scheme = uri.scheme?.lowercase(Locale.US)
