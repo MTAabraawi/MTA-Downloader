@@ -84,7 +84,7 @@ edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", """ 
 
 p = root / "app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt"
 s = p.read_text()
-old = """    fun extractFirstUrlFromSharedText(rawText: String): String? {
+old = r'''    fun extractFirstUrlFromSharedText(rawText: String): String? {
         val urlRegex = Regex("""https?://[^\\s<>"'\\]\\)]+""", RegexOption.IGNORE_CASE)
         val match = urlRegex.find(rawText.trim())
         if (match != null) return match.value
@@ -104,15 +104,15 @@ old = """    fun extractFirstUrlFromSharedText(rawText: String): String? {
         url.contains("reddit.com", true) || url.contains("v.redd.it", true) -> "Reddit"
         else -> "الويب"
     }
-"""
-new = """    fun extractFirstUrlFromSharedText(rawText: String): String? {
+'''
+new = r'''    fun extractFirstUrlFromSharedText(rawText: String): String? {
         val urlRegex = Regex("""(?i)https?://[^\\s<>"'\\]\\)]+""")
         val candidate = urlRegex.find(rawText.trim())?.value
             ?: rawText.trim().takeIf { it.contains('.') && !it.any(Char::isWhitespace) }?.let {
                 if (it.startsWith("www.", true)) "https://$it" else "https://$it"
             }
             ?: return null
-        val cleaned = candidate.trim().trimEnd('.', ',', ';', ':', '!', '?', ')', ']', '}', '"', '\\'')
+        val cleaned = candidate.trim().trimEnd('.', ',', ';', ':', '!', '?', ')', ']', '}', '،', '؛', '"', '\\'')
         return runCatching {
             val uri = java.net.URI(cleaned)
             val scheme = uri.scheme?.lowercase(Locale.US)
@@ -138,7 +138,7 @@ new = """    fun extractFirstUrlFromSharedText(rawText: String): String? {
             else -> "الويب"
         }
     }
-"""
+'''
 if new not in s:
     if old not in s:
         raise SystemExit("Patch anchor missing: URL extraction/platform detection")
