@@ -286,3 +286,182 @@ class ExampleUnitTest {
 }
 ''')
 print("Applied MTA Downloader reliability patches.")
+
+
+# Browser/navigation fixes: avoid restoring stale top-level destinations and URLs.
+edit("app/src/main/java/com/example/MainActivity.kt", """    fun navigateTopLevel(route: Any) {
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+""", """    fun navigateTopLevel(route: Any) {
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = false
+            }
+            launchSingleTop = true
+            restoreState = false
+        }
+    }
+""", "top-level navigation state")
+
+browser_tab_old = "onClick = { navigateTopLevel(BrowserRoute()) },"
+browser_tab_new = """onClick = {
+                                if (!isBrowserSelected) {
+                                    viewModel.showBrowserSitesHome()
+                                    navigateTopLevel(BrowserRoute())
+                                }
+                            },"""
+edit("app/src/main/java/com/example/MainActivity.kt", browser_tab_old, browser_tab_new, "bottom browser tab reset")
+edit("app/src/main/java/com/example/MainActivity.kt", browser_tab_old, browser_tab_new, "rail browser tab reset")
+
+# Preserve incoming ACTION_SEND_MULTIPLE content as well as normal shared text and ACTION_VIEW URLs.
+edit("app/src/main/java/com/example/MainActivity.kt", """        val sharedText = when (intent.action) {
+            Intent.ACTION_SEND -> intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
+            Intent.ACTION_VIEW -> intent.dataString
+            else -> null
+        }
+""", """        val sharedText = when (intent.action) {
+            Intent.ACTION_SEND -> intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
+            Intent.ACTION_SEND_MULTIPLE -> intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
+                ?: intent.getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.firstOrNull()?.toString()
+            Intent.ACTION_VIEW -> intent.dataString
+            else -> null
+        }
+""", "shared multiple links")
+
+# Give every requested browser navigation a monotonic identity. This avoids reloading redirects
+# or internal page navigation while still allowing the same URL to be explicitly opened again.
+edit("app/src/main/java/com/example/ui/MainViewModel.kt", """data class BrowserState(
+    val activeUrl: String = "",
+    val currentPageUrl: String = "",
+""", """data class BrowserState(
+    val activeUrl: String = "",
+    val currentPageUrl: String = "",
+    val navigationVersion: Long = 0L,
+""", "browser navigation version")
+
+edit("app/src/main/java/com/example/ui/MainViewModel.kt", """                activeUrl = normalized,
+                currentPageUrl = normalized,
+                addressInput = normalized,
+""", """                activeUrl = normalized,
+                currentPageUrl = normalized,
+                navigationVersion = it.navigationVersion + 1L,
+                addressInput = normalized,
+""", "browser navigation version increment")
+
+edit("app/src/main/java/com/example/ui/MainViewModel.kt", """    fun updateBrowserAddressInput(input: String) {
+        _browserState.update { it.copy(addressInput = input) }
+    }
+""", """    fun updateBrowserAddressInput(input: String) {
+        _browserState.update { it.copy(addressInput = input) }
+    }
+
+    fun onBrowserPageError(message: String) {
+        _snackbarMessage.value = message
+        _browserState.update { it.copy(isLoading = false, progress = 100) }
+    }
+""", "browser error reporting")
+
+edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", """    onPageProgress: (String?, String?, Boolean, Int) -> Unit,
+    onMediaDetected: (String, String?, String?) -> Unit,
+""", """    onPageProgress: (String?, String?, Boolean, Int) -> Unit,
+    onPageError: (String) -> Unit,
+    onMediaDetected: (String, String?, String?) -> Unit,
+""", "browser error callback signature")
+
+edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", """import android.graphics.Bitmap
+""", """import android.graphics.Bitmap
+import android.os.Build
+""", "WebView API level guard")
+
+edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", """    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+""", """    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var lastNavigationVersion by remember { mutableStateOf(Long.MIN_VALUE) }
+""", "browser navigation state")
+
+edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", """                            settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                            settings.useWideViewPort = true
+""", """                            settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                            settings.allowFileAccess = false
+                            settings.allowContentAccess = false
+                            settings.javaScriptCanOpenWindowsAutomatically = false
+                            settings.setSupportMultipleWindows(false)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                settings.safeBrowsingEnabled = true
+                            }
+                            settings.useWideViewPort = true
+""", "WebView hardening")
+
+edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", """                                override fun onPageStarted(
+                                    view: WebView?,
+                                    url: String?,
+                                    favicon: Bitmap?
+                                ) {
+                                    onPageProgress(url, view?.title, true, 15)
+                                }
+""", """                                override fun onPageStarted(
+                                    view: WebView?,
+                                    url: String?,
+                                    favicon: Bitmap?
+                                ) {
+                                    onPageProgress(url, view?.title, true, 15)
+                                }
+
+                                override fun onReceivedError(
+                                    view: WebView?,
+                                    request: WebResourceRequest?,
+                                    error: android.webkit.WebResourceError?
+                                ) {
+                                    if (request?.isForMainFrame == true) {
+                                        onPageError("تعذر تحميل الصفحة: خطأ في الاتصال")
+                                    }
+                                }
+
+                                override fun shouldOverrideUrlLoading(
+                                    view: WebView?,
+                                    request: WebResourceRequest?
+                                ): Boolean {
+                                    val scheme = request?.url?.scheme?.lowercase()
+                                    return scheme != "http" && scheme != "https"
+                                }
+""", "WebView navigation and error handling")
+
+edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", """                            tag = browserState.activeUrl
+                            loadUrl(browserState.activeUrl)
+""", """                            lastNavigationVersion = browserState.navigationVersion
+                            loadUrl(browserState.activeUrl)
+""", "WebView initial navigation token")
+
+edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", """                        val tagUrl = webView.tag as? String
+                        if (browserState.activeUrl.isNotBlank() && tagUrl != browserState.activeUrl) {
+                            webView.tag = browserState.activeUrl
+                            webView.loadUrl(browserState.activeUrl)
+                        }
+""", """                        if (browserState.activeUrl.isNotBlank() &&
+                            browserState.navigationVersion != lastNavigationVersion
+                        ) {
+                            lastNavigationVersion = browserState.navigationVersion
+                            webView.loadUrl(browserState.activeUrl)
+                        }
+""", "WebView navigation token update")
+
+edit("app/src/main/java/com/example/MainActivity.kt", """                                onPageProgress = viewModel::onBrowserPageProgress,
+                                onMediaDetected = viewModel::onMediaStreamDetected,
+""", """                                onPageProgress = viewModel::onBrowserPageProgress,
+                                onPageError = viewModel::onBrowserPageError,
+                                onMediaDetected = viewModel::onMediaStreamDetected,
+""", "browser error callback wiring")
+
+# Do not invent a Referer for a direct file URL; only page extraction and WebView capture know the true page.
+p = root / "app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt"
+s = p.read_text()
+s = s.replace("""            qualities = qualities,
+            refererUrl = url.substringBeforeLast('/', url)
+""", """            qualities = qualities
+""", 1)
+p.write_text(s)
