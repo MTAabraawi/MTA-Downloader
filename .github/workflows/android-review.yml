@@ -8,7 +8,7 @@ on:
       - '.github/workflows/android-review.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   review:
@@ -41,6 +41,7 @@ jobs:
         run: |
           mkdir -p project
           unzip -q mta-downloader-nov-17-2026-10-15-48-pm.zip -d project
+          python tools/apply_mta_patches.py
           find project -maxdepth 5 -type f | sort > project-files.txt
           echo "## Project inventory" >> "$GITHUB_STEP_SUMMARY"
           echo "File count: "$(wc -l < project-files.txt) >> "$GITHUB_STEP_SUMMARY"
@@ -89,6 +90,26 @@ jobs:
           gradle --no-daemon assembleDebug > ../debug-build.log 2>&1
           echo "DEBUG_BUILD_EXIT=$?" >> "$GITHUB_ENV"
           exit 0
+
+      - name: Save patched source archive after successful checks
+        if: success()
+        run: |
+          if [[ "${UNIT_TESTS_EXIT:-1}" != "0" || "${LINT_EXIT:-1}" != "0" || "${RELEASE_BUILD_EXIT:-1}" != "0" || "${DEBUG_BUILD_EXIT:-1}" != "0" ]]; then
+            echo "Checks did not all pass; refusing to update the source archive."
+            exit 1
+          fi
+          rm -f /tmp/mta-downloader-patched.zip
+          (cd project && zip -qr /tmp/mta-downloader-patched.zip .)
+          cp /tmp/mta-downloader-patched.zip mta-downloader-nov-17-2026-10-15-48-pm.zip
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mta-downloader-nov-17-2026-10-15-48-pm.zip
+          if ! git diff --cached --quiet; then
+            git commit -m "Improve shared-link intake and media download reliability"
+            git push
+          else
+            echo "Source archive already contains the current patch."
+          fi
 
       - name: Summarize results and collect APK metadata
         if: always()
