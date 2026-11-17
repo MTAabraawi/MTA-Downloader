@@ -49,6 +49,10 @@ jobs:
           find project -type f \( -name 'settings.gradle*' -o -name 'build.gradle*' -o -name 'gradle.properties' -o -name 'AndroidManifest.xml' \) -print
           echo "### app/build.gradle.kts" >> "$GITHUB_STEP_SUMMARY"
           sed -n '1,240p' project/app/build.gradle.kts >> "$GITHUB_STEP_SUMMARY"
+          cp project/app/build.gradle.kts app-build.gradle.kts
+          cp project/app/src/main/AndroidManifest.xml app-AndroidManifest.xml
+          cp project/gradle.properties project-gradle.properties
+          cp project/gradle/libs.versions.toml project-libs.versions.toml
 
       - name: Static security and configuration review
         run: |
@@ -112,6 +116,10 @@ jobs:
           name: MTA-Downloader-review-results
           path: |
             project-files.txt
+            app-build.gradle.kts
+            app-AndroidManifest.xml
+            project-gradle.properties
+            project-libs.versions.toml
             static-review.txt
             gradle-tasks.txt
             unit-tests.log
