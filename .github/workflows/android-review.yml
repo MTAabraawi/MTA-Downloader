@@ -100,7 +100,7 @@ jobs:
             exit 1
           fi
           rm -f /tmp/mta-downloader-patched.zip
-          (cd project && find . -type f ! -path '*/build/*' ! -path '*/.gradle/*' ! -name 'debug.keystore' ! -name 'ci-review-upload-key.jks' ! -name '*.jks' ! -name '*.keystore' ! -name '*.p12' ! -name 'google-services.json' ! -name 'local.properties' ! -name '.env' -printf '%P\\n' | zip -q /tmp/mta-downloader-patched.zip -@)
+          (cd project && find . -type f ! -path '*/build/*' ! -path '*/.gradle/*' ! -name 'debug.keystore' ! -name 'ci-review-upload-key.jks' ! -name '*.jks' ! -name '*.keystore' ! -name '*.p12' ! -name 'google-services.json' ! -name 'local.properties' ! -name '.env' -printf '%P\n' | zip -q /tmp/mta-downloader-patched.zip -@)
           cp /tmp/mta-downloader-patched.zip mta-downloader-nov-17-2026-10-15-48-pm.zip
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
