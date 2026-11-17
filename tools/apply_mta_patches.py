@@ -387,7 +387,7 @@ edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", """    var web
     var lastNavigationVersion by remember { mutableStateOf(Long.MIN_VALUE) }
 """, "browser navigation state")
 
-edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", """                            settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", """                            settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
                             settings.useWideViewPort = true
 """, """                            settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                             settings.allowFileAccess = false
