@@ -85,7 +85,7 @@ edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", """ 
 p = root / "app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt"
 s = p.read_text()
 old = r'''    fun extractFirstUrlFromSharedText(rawText: String): String? {
-        val urlRegex = Regex("""https?://[^\\s<>"'\\]\\)]+""", RegexOption.IGNORE_CASE)
+        val urlRegex = Regex("""https?://[^\s<>"'\]\)]+""", RegexOption.IGNORE_CASE)
         val match = urlRegex.find(rawText.trim())
         if (match != null) return match.value
         val trimmed = rawText.trim()
