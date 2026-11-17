@@ -482,3 +482,167 @@ new_tab = """onClick = {
                             },"""
 if old_tab in s:
     p.write_text(s.replace(old_tab, new_tab, 1))
+
+
+# Remove the user-facing experimental/custom extractor-server feature completely.
+def remove_block(path, old, label):
+    p = root / path
+    s = p.read_text()
+    if old not in s:
+        return
+    p.write_text(s.replace(old, "", 1))
+
+remove_block("app/src/main/java/com/example/MainActivity.kt", "import com.example.ui.components.ExtractorSettingsDialog\n", "settings dialog import")
+remove_block("app/src/main/java/com/example/MainActivity.kt", """    val showSettingsDialog by viewModel.showSettingsDialog.collectAsStateWithLifecycle()
+    val extractorEndpoint by viewModel.extractorEndpoint.collectAsStateWithLifecycle()
+""", "settings state collection")
+remove_block("app/src/main/java/com/example/MainActivity.kt", """            onOpenExtractorSettings = viewModel::openSettingsDialog,
+""", "fallback server settings callback")
+remove_block("app/src/main/java/com/example/MainActivity.kt", """    // Extractor Engine Settings Dialog
+    if (showSettingsDialog) {
+        ExtractorSettingsDialog(
+            currentEndpoint = extractorEndpoint,
+            onSaveEndpoint = viewModel::saveExtractorEndpoint,
+            onDismiss = viewModel::dismissSettingsDialog
+        )
+    }
+
+""", "extractor server settings dialog")
+
+remove_block("app/src/main/java/com/example/ui/MainViewModel.kt", """    private val _showSettingsDialog = MutableStateFlow(false)
+    val showSettingsDialog: StateFlow<Boolean> = _showSettingsDialog
+
+    private val _extractorEndpoint = MutableStateFlow(mediaExtractorEngine.getExtractorEndpoint())
+    val extractorEndpoint: StateFlow<String> = _extractorEndpoint
+
+""", "extractor settings state")
+vm = root / "app/src/main/java/com/example/ui/MainViewModel.kt"
+s = vm.read_text()
+start = s.find("    fun openSettingsDialog() {")
+end = s.find("    fun requestVideoDownload(video: VideoItem)", start)
+if start >= 0 and end > start:
+    vm.write_text(s[:start] + s[end:])
+
+remove_block("app/src/main/java/com/example/ui/screens/HomeScreen.kt", "import androidx.compose.material.icons.filled.Settings\n", "settings icon import")
+remove_block("app/src/main/java/com/example/ui/screens/HomeScreen.kt", "    onOpenSettingsClick: () -> Unit,\n", "settings callback")
+remove_block("app/src/main/java/com/example/ui/screens/HomeScreen.kt", "                    onSettingsClick = onOpenSettingsClick\n", "brand header settings argument")
+remove_block("app/src/main/java/com/example/ui/screens/HomeScreen.kt", "    onSettingsClick: () -> Unit\n", "brand header settings parameter")
+remove_block("app/src/main/java/com/example/ui/screens/HomeScreen.kt", """            IconButton(
+                onClick = onSettingsClick,
+                modifier = Modifier.testTag("extractor_settings_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Settings,
+                    contentDescription = stringResource(R.string.extractor_settings_title),
+                    tint = MtaCyanGlow
+                )
+            }
+
+""", "home settings button")
+
+remove_block("app/src/main/java/com/example/ui/components/MtaDialogs.kt", "import androidx.compose.material.icons.filled.Settings\n", "dialog settings icon import")
+remove_block("app/src/main/java/com/example/ui/components/MtaDialogs.kt", "import androidx.compose.material.icons.filled.Share\n", "dialog share icon import")
+remove_block("app/src/main/java/com/example/ui/components/MtaDialogs.kt", """    onOpenExtractorSettings: () -> Unit,
+""", "fallback settings callback")
+remove_block("app/src/main/java/com/example/ui/components/MtaDialogs.kt", """                TextButton(
+                    onClick = {
+                        onDismiss()
+                        onOpenExtractorSettings()
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = null,
+                        tint = MtaCyanGlow,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("إعداد خادم الاستخراج (Cobalt / yt-dlp)", color = MtaCyanGlow)
+                }
+""", "fallback settings action")
+dialogs = root / "app/src/main/java/com/example/ui/components/MtaDialogs.kt"
+s = dialogs.read_text()
+start = s.find("@Composable\nfun ExtractorSettingsDialog(")
+end = s.find("@Composable\nfun AdLoadingOverlayDialog()", start)
+if start >= 0 and end > start:
+    dialogs.write_text(s[:start] + s[end:])
+
+engine = root / "app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt"
+s = engine.read_text()
+for line in [
+    "import android.content.SharedPreferences\n",
+    "import kotlinx.serialization.json.Json\n",
+    "import kotlinx.serialization.json.JsonArray\n",
+    "import kotlinx.serialization.json.JsonObject\n",
+    "import kotlinx.serialization.json.JsonPrimitive\n",
+    "import kotlinx.serialization.json.contentOrNull\n",
+    "import kotlinx.serialization.json.jsonArray\n",
+    "import kotlinx.serialization.json.jsonObject\n",
+    "import kotlinx.serialization.json.jsonPrimitive\n",
+    "import okhttp3.MediaType.Companion.toMediaType\n",
+    "import okhttp3.RequestBody.Companion.toRequestBody\n",
+]:
+    s = s.replace(line, "")
+s = s.replace(" * 2. Configurable Extractor Backend API (Cobalt / yt-dlp compatible JSON endpoint)\n", "")
+s = s.replace("    private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)\n\n", "")
+s = s.replace("    private val json = Json { ignoreUnknownKeys = true }\n\n", "")
+s = re.sub(r"    fun getExtractorEndpoint\(\): String =\n        prefs\.getString\(KEY_EXTRACTOR_ENDPOINT, \"\"\)\?\.trim\(\)\.orEmpty\(\)\n\n    fun setExtractorEndpoint\(url: String\) \{\n        prefs\.edit\(\)\.putString\(KEY_EXTRACTOR_ENDPOINT, url\.trim\(\)\)\.apply\(\)\n    \}\n\n", "", s)
+start = s.find("    private fun queryBackendExtractorApi(")
+end = s.find("    private fun scrapeHtmlForMedia(", start)
+if start >= 0 and end > start:
+    s = s[:start] + s[end:]
+s = s.replace("        private const val PREFS_NAME = \"mta_extractor_prefs\"\n", "")
+s = s.replace("        private const val KEY_EXTRACTOR_ENDPOINT = \"extractor_endpoint_url\"\n", "")
+# Keep the constructor parameter for existing app/test wiring, but no server configuration or network endpoint remains.
+s = s.replace("class MediaExtractorEngine(context: Context) {", "class MediaExtractorEngine(@Suppress(\"UNUSED_PARAMETER\") context: Context) {")
+engine.write_text(s)
+
+# Captured browser streams need the actual page Referer; a direct URL must not receive a fabricated one.
+edit("app/src/main/java/com/example/ui/MainViewModel.kt", """            val videoItem = catalogRepository.buildFromCapturedBrowserStreams(
+                streams = captured,
+                pageTitle = state.pageTitle,
+                platform = platform
+            )
+            requestVideoDownload(videoItem)
+""", """            val videoItem = catalogRepository.buildFromCapturedBrowserStreams(
+                streams = captured,
+                pageTitle = state.pageTitle,
+                platform = platform
+            )
+            val pageReferer = state.activeUrl
+            val videoWithHeaders = videoItem.copy(
+                qualities = videoItem.qualities.map { quality ->
+                    quality.copy(
+                        requestHeaders = quality.requestHeaders +
+                            mapOf("Referer" to pageReferer)
+                    )
+                }
+            )
+            requestVideoDownload(videoWithHeaders)
+""", "browser captured-stream referer")
+
+# Add a conservative User-Agent when a source did not provide one.
+edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", """            val dmRequest = DownloadManager.Request(Uri.parse(targetStreamUrl)).apply {
+                quality.requestHeaders.forEach { (name, value) ->
+""", """            val dmRequest = DownloadManager.Request(Uri.parse(targetStreamUrl)).apply {
+                if (quality.requestHeaders.keys.none { it.equals("User-Agent", ignoreCase = true) }) {
+                    addRequestHeader("User-Agent", "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36")
+                }
+                quality.requestHeaders.forEach { (name, value) ->
+""", "default download user agent")
+
+# The route's LaunchedEffect opens the initial URL; avoid issuing a duplicate load beforehand.
+edit("app/src/main/java/com/example/MainActivity.kt", """                                onSiteClick = { site ->
+                                    viewModel.openSiteInBrowser(site.url)
+                                    navigateTopLevel(BrowserRoute(initialUrl = site.url))
+                                },
+""", """                                onSiteClick = { site ->
+                                    navigateTopLevel(BrowserRoute(initialUrl = site.url))
+                                },
+""", "avoid duplicate site load")
+edit("app/src/main/java/com/example/MainActivity.kt", """                viewModel.dismissSmartBrowserFallback()
+                viewModel.openSiteInBrowser(url)
+                navigateTopLevel(BrowserRoute(initialUrl = url))
+""", """                viewModel.dismissSmartBrowserFallback()
+                navigateTopLevel(BrowserRoute(initialUrl = url))
+""", "avoid duplicate fallback load")
