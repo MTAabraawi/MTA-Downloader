@@ -338,21 +338,24 @@ edit("app/src/main/java/com/example/MainActivity.kt", """        val sharedText 
 # or internal page navigation while still allowing the same URL to be explicitly opened again.
 edit("app/src/main/java/com/example/ui/MainViewModel.kt", """data class BrowserState(
     val activeUrl: String = "",
-    val currentPageUrl: String = "",
+    val addressInput: String = "",
 """, """data class BrowserState(
     val activeUrl: String = "",
-    val currentPageUrl: String = "",
     val navigationVersion: Long = 0L,
+    val addressInput: String = "",
 """, "browser navigation version")
 
 edit("app/src/main/java/com/example/ui/MainViewModel.kt", """                activeUrl = normalized,
-                currentPageUrl = normalized,
                 addressInput = normalized,
+                detectedStreams = emptyList()
 """, """                activeUrl = normalized,
-                currentPageUrl = normalized,
                 navigationVersion = it.navigationVersion + 1L,
                 addressInput = normalized,
-""", "browser navigation version increment")
+                pageTitle = "",
+                isLoading = true,
+                progress = 0,
+                detectedStreams = emptyList()
+""", "browser navigation version increment and reset")
 
 edit("app/src/main/java/com/example/ui/MainViewModel.kt", """    fun updateBrowserAddressInput(input: String) {
         _browserState.update { it.copy(addressInput = input) }
