@@ -47,6 +47,8 @@ jobs:
           sed -n '1,160p' project-files.txt >> "$GITHUB_STEP_SUMMARY"
           echo "## Build configuration" >> "$GITHUB_STEP_SUMMARY"
           find project -type f \( -name 'settings.gradle*' -o -name 'build.gradle*' -o -name 'gradle.properties' -o -name 'AndroidManifest.xml' \) -print
+          echo "### app/build.gradle.kts" >> "$GITHUB_STEP_SUMMARY"
+          sed -n '1,240p' project/app/build.gradle.kts >> "$GITHUB_STEP_SUMMARY"
 
       - name: Static security and configuration review
         run: |
@@ -68,6 +70,8 @@ jobs:
         run: |
           cd project
           set +e
+          # Generate a disposable CI-only debug key required by this project configuration.
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" >/dev/null 2>&1
           gradle --no-daemon tasks --all > ../gradle-tasks.txt 2>&1
           echo "TASKS_EXIT=$?" >> "$GITHUB_ENV"
           gradle --no-daemon testDebugUnitTest > ../unit-tests.log 2>&1
