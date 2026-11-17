@@ -3,7 +3,7 @@ name: Android Project Review
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, 'fix/browser-navigation-and-download-flow']
     paths:
       - '.github/workflows/android-review.yml'
       - 'tools/apply_mta_patches.py'
