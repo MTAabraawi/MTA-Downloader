@@ -130,5 +130,11 @@ jobs:
             report-files.txt
             project/**/build/reports/**
             project/**/build/outputs/apk/**
+            project/**/src/**
+            project/**/*.gradle
+            project/**/*.gradle.kts
+            project/**/*.toml
+            project/**/*.properties
+            project/**/AndroidManifest.xml
           if-no-files-found: warn
           retention-days: 14
