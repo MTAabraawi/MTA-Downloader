@@ -106,7 +106,7 @@ old = r'''    fun extractFirstUrlFromSharedText(rawText: String): String? {
     }
 '''
 new = r'''    fun extractFirstUrlFromSharedText(rawText: String): String? {
-        val urlRegex = Regex("""(?i)https?://[^\\s<>"'\\]\\)]+""")
+        val urlRegex = Regex("""(?i)https?://[^\s<>"'\]\)]+""")
         val candidate = urlRegex.find(rawText.trim())?.value
             ?: rawText.trim().takeIf { it.contains('.') && !it.any(Char::isWhitespace) }?.let {
                 if (it.startsWith("www.", true)) "https://$it" else "https://$it"
