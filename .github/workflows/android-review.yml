@@ -43,7 +43,7 @@ jobs:
           unzip -q mta-downloader-nov-17-2026-10-15-48-pm.zip -d project
           find project -maxdepth 5 -type f | sort > project-files.txt
           echo "## Project inventory" >> "$GITHUB_STEP_SUMMARY"
-          echo 'File count: '$(wc -l < project-files.txt) >> "$GITHUB_STEP_SUMMARY"
+          echo "File count: "$(wc -l < project-files.txt) >> "$GITHUB_STEP_SUMMARY"
           sed -n '1,160p' project-files.txt >> "$GITHUB_STEP_SUMMARY"
           echo "## Build configuration" >> "$GITHUB_STEP_SUMMARY"
           find project -type f \( -name 'settings.gradle*' -o -name 'build.gradle*' -o -name 'gradle.properties' -o -name 'AndroidManifest.xml' \) -print
@@ -74,7 +74,7 @@ jobs:
         run: |
           cd project
           set +e
-          # Generate a disposable CI-only debug key required by this project configuration.
+          # Disposable CI-only debug key; never used for a store release.
           keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" >/dev/null 2>&1
           gradle --no-daemon tasks --all > ../gradle-tasks.txt 2>&1
           echo "TASKS_EXIT=$?" >> "$GITHUB_ENV"
@@ -82,7 +82,9 @@ jobs:
           echo "UNIT_TESTS_EXIT=$?" >> "$GITHUB_ENV"
           gradle --no-daemon lint > ../lint.log 2>&1
           echo "LINT_EXIT=$?" >> "$GITHUB_ENV"
-          gradle --no-daemon assembleRelease > ../release-build.log 2>&1
+          # Use a throwaway CI signing key so Release packaging can be tested without exposing the real upload key.
+          keytool -genkeypair -v -keystore ci-review-upload-key.jks -storepass ci-review-only -alias upload -keypass ci-review-only -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=MTA CI Review,O=MTA Technologies,C=YE" >/dev/null 2>&1
+          KEYSTORE_PATH="$PWD/ci-review-upload-key.jks" STORE_PASSWORD="ci-review-only" KEY_PASSWORD="ci-review-only" gradle --no-daemon assembleRelease > ../release-build.log 2>&1
           echo "RELEASE_BUILD_EXIT=$?" >> "$GITHUB_ENV"
           gradle --no-daemon assembleDebug > ../debug-build.log 2>&1
           echo "DEBUG_BUILD_EXIT=$?" >> "$GITHUB_ENV"
@@ -98,10 +100,10 @@ jobs:
             echo "| Gradle task discovery | ${TASKS_EXIT:-not-run} |"
             echo "| Unit tests | ${UNIT_TESTS_EXIT:-not-run} |"
             echo "| Android lint | ${LINT_EXIT:-not-run} |"
-            echo "| Release build | ${RELEASE_BUILD_EXIT:-not-run} |"
+            echo "| Release build (temporary CI key) | ${RELEASE_BUILD_EXIT:-not-run} |"
             echo "| Debug build | ${DEBUG_BUILD_EXIT:-not-run} |"
             echo
-            echo "Exit code 0 means the command completed successfully. Review lint reports and logs for warnings."
+            echo "Exit code 0 means the command completed successfully. The CI-only Release APK is not signed with the production upload key and must never be distributed."
             echo
             echo "### APK outputs"
             find project -type f -path '*/build/outputs/apk/*/*.apk' -print 2>/dev/null || true
