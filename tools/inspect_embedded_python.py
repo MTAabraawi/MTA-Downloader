@@ -34,6 +34,11 @@ def scan_archive(archive, archive_label, packages, relevant_entries, version_hin
                 match = re.search(r"(?m)^__version__\s*=\s*['""]([^'""]+)", source)
                 if match:
                     version_hints["yt-dlp"] = match.group(1)
+        if lower.endswith("/certifi/__init__.py"):
+            source = archive.read(name).decode("utf-8", errors="replace")
+            match = re.search(r"(?m)^__version__\s*=\s*['""]([^'""]+)", source)
+            if match:
+                version_hints["certifi"] = match.group(1)
         if lower.endswith(".zip") or lower.endswith(".whl"):
             if depth < 2:
                 try:
