@@ -245,6 +245,58 @@ def tests(s):
     return s
 edit("app/src/test/java/com/example/ExampleRobolectricTest.kt", tests)
 
+# Do not expose invented 1080p/720p choices as defaults; only the extractor may populate real streams.
+def model(s):
+    s = s.replace("val qualities: List<QualityOption> = defaultVideoQualities()",
+                  "val qualities: List<QualityOption> = emptyList()")
+    a = s.find("\\nfun defaultVideoQualities(): List<QualityOption> = listOf(")
+    if a >= 0:
+        s = s[:a].rstrip() + "\\n"
+    return s
+edit("app/src/main/java/com/example/data/model/VideoModels.kt", model)
+
+def vm_import(s):
+    return s.replace("import com.example.data.model.defaultVideoQualities\\n", "")
+edit("app/src/main/java/com/example/ui/MainViewModel.kt", vm_import)
+
+# Offer honest automatic video/audio selectors for unresolved pages; do not invent resolutions.
+def fallback(s):
+    old = """                    qualities = listOf(
+                        QualityOption(
+                            id = "best",
+                            label = "أفضل جودة متاحة",
+                            format = "تلقائي",
+                            sizeEstimate = "يحددها المحرك",
+                            extension = "mp4",
+                            mimeType = "video/mp4",
+                            overrideStreamUrl = normalizedUrl
+                        )
+                    )"""
+    new = """                    qualities = listOf(
+                        QualityOption(
+                            id = "best",
+                            label = "أفضل فيديو متاح",
+                            format = "اختيار تلقائي من المحرك",
+                            sizeEstimate = "يحدد بعد التحليل",
+                            extension = "مkv",
+                            mimeType = "video/*",
+                            overrideStreamUrl = normalizedUrl
+                        ),
+                        QualityOption(
+                            id = "m4a",
+                            label = "أفضل صوت متاح",
+                            format = "صوت فقط • اختيار تلقائي",
+                            sizeEstimate = "يحدد بعد التحليل",
+                            extension = "m4a",
+                            mimeType = "audio/mp4",
+                            overrideStreamUrl = normalizedUrl
+                        )
+                    )"""
+    if old not in s:
+        raise SystemExit("Unresolved-page selector block not found")
+    return s.replace(old, new, 1)
+edit("app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt", fallback)
+
 # Verify the Android source no longer contains ad SDK IDs, permissions, callbacks, or libraries.
 scan_roots = [root / "app/src/main", root / "app/build.gradle.kts"]
 patterns = re.compile(r"StartApp|StartIo|Start\.io|210745939|AD_ID|onVideoCompleted|com\.startapp|rewarded.?ad", re.I)
