@@ -7,6 +7,7 @@ import android.os.Build
 import android.provider.MediaStore
 import android.net.Uri
 import android.os.Environment
+import com.example.data.download.SegmentedHttpDownloader
 import com.example.data.local.DownloadDao
 import com.example.data.local.DownloadEntity
 import com.example.data.model.DownloadStatus
@@ -31,6 +32,8 @@ class DownloadRepository(
     private val context: Context,
     private val downloadDao: DownloadDao
 ) {
+    private val segmentedDownloader by lazy { SegmentedHttpDownloader() }
+
     private val downloadManager: DownloadManager by lazy {
         context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
     }
@@ -55,22 +58,8 @@ class DownloadRepository(
                 .ifBlank { "mta_video_${System.currentTimeMillis()}" }
             val fileName = "${sanitizedName}_${quality.id}.${quality.extension}"
 
-            val dmRequest = DownloadManager.Request(Uri.parse(targetStreamUrl)).apply {
-                setTitle(request.title)
-                setDescription("MTA Downloader • ${quality.label}")
-                setMimeType(quality.mimeType)
-                setAllowedOverMetered(true)
-                setAllowedOverRoaming(true)
-                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                setDestinationInExternalPublicDir(
-                    Environment.DIRECTORY_DOWNLOADS,
-                    "MTA_Downloader/$fileName"
-                )
-            }
-
-            val systemId = downloadManager.enqueue(dmRequest)
             val entity = DownloadEntity(
-                systemDownloadId = systemId,
+                systemDownloadId = 0L,
                 title = request.title,
                 sourceUrl = targetStreamUrl,
                 sourcePlatform = request.sourcePlatform,
@@ -82,7 +71,79 @@ class DownloadRepository(
                 thumbnailUrl = request.thumbnailUrl,
                 thumbnailResId = request.thumbnailRes
             )
-            downloadDao.insert(entity)
+            val entityId = downloadDao.insert(entity)
+            val trackedEntity = entity.copy(id = entityId)
+            val appDownloads = requireNotNull(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)) {
+                "مساحة التخزين غير متاحة"
+            }
+            val segmentedDirectory = File(appDownloads, "MTA_Downloader")
+            check(segmentedDirectory.exists() || segmentedDirectory.mkdirs()) { "تعذر إنشاء مجلد التنزيلات" }
+            val segmentedTarget = File(segmentedDirectory, fileName)
+            val progressScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val lastProgressAt = AtomicLong(0L)
+            val segmentedFile = try {
+                segmentedDownloader.downloadIfResumable(targetStreamUrl, segmentedTarget) { progress ->
+                    val now = System.currentTimeMillis()
+                    if (now - lastProgressAt.get() >= 800L && lastProgressAt.getAndSet(now) <= now) {
+                        progressScope.launch {
+                            downloadDao.update(
+                                trackedEntity.copy(
+                                    progress = if (progress.totalBytes > 0L)
+                                        ((progress.downloadedBytes * 100L) / progress.totalBytes).toInt().coerceIn(0, 99)
+                                    else 0,
+                                    downloadedBytes = progress.downloadedBytes,
+                                    totalBytes = progress.totalBytes
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (error: Throwable) {
+                progressScope.cancel()
+                downloadDao.update(trackedEntity.copy(status = DownloadStatus.FAILED.name))
+                throw error
+            }
+
+            if (segmentedFile != null) {
+                progressScope.cancel()
+                val publicUri = publishToDownloads(segmentedFile, request.title)
+                downloadDao.update(
+                    trackedEntity.copy(
+                        format = segmentedFile.extension.uppercase(),
+                        fileName = segmentedFile.name,
+                        localUri = publicUri.toString(),
+                        status = DownloadStatus.COMPLETED.name,
+                        progress = 100,
+                        downloadedBytes = segmentedFile.length(),
+                        totalBytes = segmentedFile.length()
+                    )
+                )
+                if (publicUri.scheme == "content") segmentedFile.delete()
+                return@runCatching entityId
+            }
+            progressScope.cancel()
+
+            val dmRequest = DownloadManager.Request(Uri.parse(targetStreamUrl)).apply {
+                setTitle(request.title)
+                setDescription("MTA Downloader • " + quality.label)
+                setMimeType(quality.mimeType)
+                setAllowedOverMetered(true)
+                setAllowedOverRoaming(true)
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                setDestinationInExternalPublicDir(
+                    Environment.DIRECTORY_DOWNLOADS,
+                    "MTA_Downloader/" + fileName
+                )
+            }
+
+            val systemId = downloadManager.enqueue(dmRequest)
+            downloadDao.update(
+                trackedEntity.copy(
+                    systemDownloadId = systemId,
+                    status = DownloadStatus.DOWNLOADING.name
+                )
+            )
+            entityId
         }
     }
 
