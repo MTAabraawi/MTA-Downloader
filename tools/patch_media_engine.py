@@ -344,19 +344,21 @@ def ensure_repo_locale(s):
 edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", ensure_repo_locale)
 
 def segmented_downloader_testability(s):
-    s = s.replace(
-        "private val parallelism: Int = 4\n)",
-        "private val parallelism: Int = 4,\n    private val minimumSegmentedSize: Long = 16L * 1024L * 1024L\n)"
-    )
-    s = s.replace(
-        "probe.total <= 16L *  1024L * 1024L",
-        "probe.total <= minimumSegmentedSize"
-    )
+    if "minimumSegmentedSize" not in s:
+        s, count = re.subn(
+            r"(private val parallelism: Int = 4)(\s*\))",
+            r"\1,\n    private val minimumSegmentedSize: Long = 16L * 1024L * 1024L\2",
+            s,
+            count=1
+        )
+        if count != 1:
+            raise SystemExit("Could not add configurable segmented download threshold.")
     s = s.replace(
         "probe.total <= 16L * 1024L * 1024L",
         "probe.total <= minimumSegmentedSize"
     )
     return s
+
 edit("app/src/main/java/com/example/data/download/SegmentedHttpDownloader.kt", segmented_downloader_testability)
 
 def reject_weak_etag_for_if_range(s):
