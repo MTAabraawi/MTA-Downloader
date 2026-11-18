@@ -684,13 +684,13 @@ def browser_headers(s):
     )
     # Keep compatibility with every existing callback call while passing only request headers.
     s = re.sub(
-        r"onMediaDetected\\(([^,]+),\\s*([^,]+),\\s*null\\)",
-        r"onMediaDetected(\\1, \\2, null, request?.requestHeaders.orEmpty())",
+        r"onMediaDetected\(([^,]+),\s*([^,]+),\s*null\)",
+        r"onMediaDetected(\1, \2, null, request?.requestHeaders.orEmpty())",
         s
     )
     s = re.sub(
-        r"onMediaDetected\\(([^,]+),\\s*([^,]+),\\s*([A-Za-z_][A-Za-z0-9_]*)\\)",
-        r"onMediaDetected(\\1, \\2, \\3, emptyMap())",
+        r"onMediaDetected\(([^,]+),\s*([^,]+),\s*([A-Za-z_][A-Za-z0-9_]*)\)",
+        r"onMediaDetected(\1, \2, \3, emptyMap())",
         s
     )
     # Recognize adaptive manifests as media candidates; do not treat TS/M4S segments as files.
