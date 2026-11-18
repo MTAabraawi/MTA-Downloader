@@ -494,11 +494,17 @@ def main_activity_download_callbacks(s):
 edit("app/src/main/java/com/example/MainActivity.kt", main_activity_download_callbacks)
 
 def downloads_screen_pause_resume(s):
-    s = s.replace("import androidx.compose.material.icons.filled.PlayArrow\\n",
-                  "import androidx.compose.material.icons.filled.PlayArrow\\nimport androidx.compose.material.icons.filled.Pause\\n")
     s = s.replace(
-        "    onDeleteDownload: (DownloadEntity) -> Unit,\\n    onExploreVideosClick: () -> Unit,",
-        "    onDeleteDownload: (DownloadEntity) -> Unit,\\n    onPauseDownload: (DownloadEntity) -> Unit,\\n    onResumeDownload: (DownloadEntity) -> Unit,\\n    onExploreVideosClick: () -> Unit,"
+        "import androidx.compose.material.icons.filled.PlayArrow\n",
+        "import androidx.compose.material.icons.filled.PlayArrow\nimport androidx.compose.material.icons.filled.Pause\n"
+    )
+    s = s.replace(
+        """    onDeleteDownload: (DownloadEntity) -> Unit,
+    onExploreVideosClick: () -> Unit,""",
+        """    onDeleteDownload: (DownloadEntity) -> Unit,
+    onPauseDownload: (DownloadEntity) -> Unit,
+    onResumeDownload: (DownloadEntity) -> Unit,
+    onExploreVideosClick: () -> Unit,"""
     )
     s = s.replace(
         "it.status == DownloadStatus.DOWNLOADING.name || it.status == DownloadStatus.QUEUED.name",
@@ -506,36 +512,57 @@ def downloads_screen_pause_resume(s):
         1
     )
     s = s.replace(
-        "it.status == DownloadStatus.QUEUED.name ||\\n                    it.status == DownloadStatus.FAILED.name",
-        "it.status == DownloadStatus.QUEUED.name ||\\n                    it.status == DownloadStatus.PAUSED.name ||\\n                    it.status == DownloadStatus.FAILED.name"
+        """it.status == DownloadStatus.QUEUED.name ||
+                    it.status == DownloadStatus.FAILED.name""",
+        """it.status == DownloadStatus.QUEUED.name ||
+                    it.status == DownloadStatus.PAUSED.name ||
+                    it.status == DownloadStatus.FAILED.name"""
     )
     s = s.replace(
-        "text = \\"$activeCount نشط • $completedCount مكتمل\\"",
-        "text = \\"$activeCount نشط/متوقف • $completedCount مكتمل\\""
+        'text = "$activeCount نشط • $completedCount مكتمل"',
+        'text = "$activeCount نشط/متوقف • $completedCount مكتمل"'
     )
     s = s.replace(
         "                    onDeleteClick = { onDeleteDownload(item) }",
-        "                    onDeleteClick = { onDeleteDownload(item) },\\n                    onPauseClick = { onPauseDownload(item) },\\n                    onResumeClick = { onResumeDownload(item) }"
+        """                    onDeleteClick = { onDeleteDownload(item) },
+                    onPauseClick = { onPauseDownload(item) },
+                    onResumeClick = { onResumeDownload(item) }"""
     )
     s = s.replace(
-        "    onDeleteClick: () -> Unit\\n)",
-        "    onDeleteClick: () -> Unit,\\n    onPauseClick: () -> Unit,\\n    onResumeClick: () -> Unit\\n)"
+        """    onDeleteClick: () -> Unit
+)""",
+        """    onDeleteClick: () -> Unit,
+    onPauseClick: () -> Unit,
+    onResumeClick: () -> Unit
+)"""
     )
     s = s.replace(
-        "        DownloadStatus.FAILED -> MtaErrorRed\\n        else -> MtaNeonBlue",
-        "        DownloadStatus.FAILED -> MtaErrorRed\\n        DownloadStatus.PAUSED -> MtaTextSecondary\\n        else -> MtaNeonBlue"
+        """        DownloadStatus.FAILED -> MtaErrorRed
+        else -> MtaNeonBlue""",
+        """        DownloadStatus.FAILED -> MtaErrorRed
+        DownloadStatus.PAUSED -> MtaTextSecondary
+        else -> MtaNeonBlue"""
     )
     s = s.replace(
-        "                            DownloadStatus.FAILED -> Icons.Filled.ErrorOutline\\n                            else -> Icons.Filled.CloudDownload",
-        "                            DownloadStatus.FAILED -> Icons.Filled.ErrorOutline\\n                            DownloadStatus.PAUSED -> Icons.Filled.Pause\\n                            else -> Icons.Filled.CloudDownload"
+        """                            DownloadStatus.FAILED -> Icons.Filled.ErrorOutline
+                            else -> Icons.Filled.CloudDownload""",
+        """                            DownloadStatus.FAILED -> Icons.Filled.ErrorOutline
+                            DownloadStatus.PAUSED -> Icons.Filled.Pause
+                            else -> Icons.Filled.CloudDownload"""
     )
     s = s.replace(
         "if (status == DownloadStatus.DOWNLOADING || status == DownloadStatus.QUEUED)",
         "if (status == DownloadStatus.DOWNLOADING || status == DownloadStatus.QUEUED || status == DownloadStatus.PAUSED)"
     )
     s = s.replace(
-        "                } else if (status == DownloadStatus.FAILED) {\\n                    \\"تعذر التحميل\\"",
-        "                } else if (status == DownloadStatus.FAILED) {\\n                    \\"تعذر التحميل\\"\\n                } else if (status == DownloadStatus.PAUSED) {\\n                    \\"متوقف مؤقتاً\\""
+        """                } else if (status == DownloadStatus.FAILED) {
+                    "تعذر التحميل"
+                } else {""",
+        """                } else if (status == DownloadStatus.FAILED) {
+                    "تعذر التحميل"
+                } else if (status == DownloadStatus.PAUSED) {
+                    "متوقف مؤقتاً"
+                } else {"""
     )
     old = """                    DownloadStatus.FAILED -> {
                         Button(
