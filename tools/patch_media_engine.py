@@ -3,12 +3,14 @@ import sys
 
 target = Path(sys.argv[1])
 source = target.read_text(encoding="utf-8")
-start_marker = "            // Layer 4: Protected / JS-heavy page"
-end_marker = "\n        }\n\n    private fun probeDirectMediaUrl("
-start = source.find(start_marker)
-end = source.find(end_marker, start)
+start = source.find("// Layer 4:")
+end = source.find("private fun probeDirectMediaUrl(", start)
 if start < 0 or end < 0:
-    raise SystemExit("Expected extractor fallback boundary was not found; refusing to patch.")
+    raise SystemExit(f"Extractor patch anchors missing (start={start}, end={end}); refusing to patch.")
+close = source.rfind("        }", start, end)
+if close < start:
+    raise SystemExit("Could not locate extractMedia method closing brace; refusing to patch.")
+line_start = source.rfind("\n", 0, start) + 1
 replacement = """            // Final layer: pass the page URL to the on-device yt-dlp engine.
             // The rewarded-ad gate remains in MainViewModel before DownloadRepository is called.
             MediaExtractionResult.Success(
@@ -27,6 +29,7 @@ replacement = """            // Final layer: pass the page URL to the on-device 
                     description = "سيحاول محرك yt-dlp المحلي استخراج الوسائط بعد إكمال إعلان المكافأة. قد لا تدعم بعض الروابط أو قد تفرض المنصة قيوداً على الوصول.",
                     qualities = com.example.data.model.defaultVideoQualities()
                 )
-            )"""
-target.write_text(source[:start] + replacement + source[end:], encoding="utf-8")
-print("Patched MediaExtractorEngine: page URLs now reach the local extractor.")
+            )
+"""
+target.write_text(source[:line_start] + replacement + source[close:], encoding="utf-8")
+print("Patched MediaExtractorEngine: unresolved page URLs now reach local yt-dlp.")
