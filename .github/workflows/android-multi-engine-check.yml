@@ -18,6 +18,7 @@ on:
       - 'THIRD-PARTY-NOTICES.md'
       - 'docs/**'
       - '.github/workflows/android-multi-engine-check.yml'
+      - '.github/workflows/android-release.yml'
 
 concurrency:
   group: mta-multi-engine-${{ github.ref }}
