@@ -79,6 +79,17 @@ def main():
     apk_ffmpeg = [name for name in apk_entries if ffmpeg_pattern.search(name)]
     aar_ffmpeg = [name for name in aar_entries if ffmpeg_pattern.search(name)]
     ffmpeg_components = [c for c in components if "ffmpeg" in c.get("name", "").lower() or "ffmpegkit" in c.get("name", "").lower()]
+    manifest_path = args.output.with_name("embedded-python-packages.json")
+    previous_manifest = {}
+    if manifest_path.is_file():
+        try:
+            previous_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            previous_manifest = {}
+    if not python_packages:
+        python_packages = previous_manifest.get("python_distributions", [])
+    python_version_hints = previous_manifest.get("version_hints_from_sources", {})
+    relevant_aar_entries = previous_manifest.get("relevant_archive_entries", [])
 
     lines = [
         "# MTA Downloader — dependency and license audit",
@@ -110,9 +121,17 @@ def main():
     lines += ["", "## Python distributions discovered inside the yt-dlp Android AAR", "", "| Package | Version | License metadata |", "|---|---:|---|"]
     if python_packages:
         for package in sorted(python_packages, key=lambda p: p["name"].lower()):
-            lines.append("| " + package["name"] + " | " + package["version"] + " | " + package["license"].replace("|", "\\|") + " |")
+            lines.append("| " + package["name"] + " | " + package["version"] + " | " + package.get("license", "NOT_REPORTED").replace("|", "\\|") + " |")
     else:
-        lines.append("No .dist-info/METADATA records were found in the cached AAR; inspect the AAR contents and upstream packaging manually.")
+        lines.append("No .dist-info/METADATA records were found in the cached AAR.")
+    if python_version_hints:
+        lines += ["", "### Versions recovered from embedded Python source files", ""]
+        for name, version in sorted(python_version_hints.items()):
+            lines.append("- " + name + ": " + version)
+    if relevant_aar_entries:
+        lines += ["", "### Relevant AAR archive entries (sample)", ""]
+        for entry in relevant_aar_entries[:80]:
+            lines.append("- " + entry)
 
     lines += ["", "## Components and declared licenses", "", "| Component | Version | License metadata |", "|---|---:|---|"]
     for component in components:
@@ -153,13 +172,7 @@ def main():
     ]
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text("\n".join(lines), encoding="utf-8")
-    manifest = args.output.with_name("embedded-python-packages.json")
-    previous_manifest = {}
-    if manifest.is_file():
-        try:
-            previous_manifest = json.loads(manifest.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            previous_manifest = {}
+    manifest = manifest_path
     manifest.write_text(json.dumps({
         "wrapper": "dev.ffmpegkit-maintained:yt-dlp-android:2.0.2",
         "aar_files_inspected": [str(path) for path in aar_candidates],
