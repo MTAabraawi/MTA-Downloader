@@ -343,6 +343,22 @@ def ensure_repo_locale(s):
     return s
 edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", ensure_repo_locale)
 
+def normalize_download_media_types(s):
+    s = s.replace(
+        '".mp3", ".m4a", ".aac", ".wav", ".ogg", ".vtt"',
+        '".mp3", ".m4a", ".aac", ".wav", ".ogg", ".opus", ".mkv", ".flv", ".vtt"'
+    )
+    s = s.replace(
+        '"mp3", "m4a", "aac", "wav", "ogg", "opus", "flv", "ts", "vtt"',
+        '"mp3", "m4a", "aac", "wav", "ogg", "opus", "flv", "mkv", "ts", "vtt"'
+    )
+    s = s.replace(
+        '"mp3" -> "audio/mpeg"\\n            "m4a" -> "audio/mp4"',
+        '"mp3" -> "audio/mpeg"\\n            "m4a" -> "audio/mp4"\\n            "aac" -> "audio/aac"\\n            "wav" -> "audio/wav"\\n            "ogg" -> "audio/ogg"\\n            "flv" -> "video/x-flv"'
+    )
+    return s
+edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", normalize_download_media_types)
+
 def strings(s):
     return re.sub(r"\s*<string name=\"reward_[^\"]+\">.*?</string>", "", s, flags=re.S)
 edit("app/src/main/res/values/strings.xml", strings)
