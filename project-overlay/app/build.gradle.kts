@@ -12,7 +12,6 @@ plugins {
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
-
   defaultConfig {
     applicationId = "com.aistudio.mtadownloader.xktmqa"
     minSdk = 24
@@ -22,7 +21,6 @@ android {
     versionName = "1.0"
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
-
   signingConfigs {
     create("release") {
       val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
@@ -38,7 +36,6 @@ android {
       keyPassword = "android"
     }
   }
-
   buildTypes {
     release {
       isCrunchPngs = false
@@ -59,7 +56,6 @@ android {
     includeInBundle = true
   }
 }
-
 secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
@@ -88,10 +84,8 @@ dependencies {
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.okhttp)
-  // On-device yt-dlp engine; MIT wrapper. Keep to supported 64-bit ABIs.
+  // On-device yt-dlp runtime. No advertising SDKs are included.
   implementation("dev.ffmpegkit-maintained:yt-dlp-android:2.0.2")
-  // Start.io rewarded ads are intentionally preserved.
-  implementation("com.startapp:inapp-sdk:5.+")
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
