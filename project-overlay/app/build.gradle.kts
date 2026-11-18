@@ -42,6 +42,7 @@ android {
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
+    isCoreLibraryDesugaringEnabled = true
   }
   buildFeatures { compose = true; buildConfig = true }
   testOptions { unitTests { isIncludeAndroidResources = true } }
@@ -78,6 +79,9 @@ dependencies {
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.okhttp)
+  // Native NewPipe Extractor provider plus the existing on-device yt-dlp fallback.
+  implementation("com.github.teamnewpipe:NewPipeExtractor:v0.27.1")
+  coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
   // On-device yt-dlp runtime. No advertising SDKs are included.
   implementation("dev.ffmpegkit-maintained:yt-dlp-android:2.0.2")
   testImplementation(libs.androidx.compose.ui.test.junit4)
