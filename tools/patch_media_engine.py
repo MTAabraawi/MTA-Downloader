@@ -13,8 +13,8 @@ source = target.read_text(encoding="utf-8")
 
 # Add native NewPipe extraction after direct-file probing and before generic HTML parsing.
 native_anchor = re.compile(
-    r"(probeDirectMediaUrl\\(normalizedUrl, platform, customTitle\\)\\?\\.let \\{ directItem ->"
-    r"\\s*return@withContext MediaExtractionResult\\.Success\\(directItem\\)\\s*\\})"
+    r"(probeDirectMediaUrl\(normalizedUrl, platform, customTitle\)\?\.let \{ directItem ->"
+    r"\s*return@withContext MediaExtractionResult\.Success\(directItem\)\s*\})"
 )
 if "NewPipeMediaProvider.extract(" not in source:
     source, count = native_anchor.subn(
@@ -56,13 +56,13 @@ def configure_jitpack():
         return
     scope = content.find("dependencyResolutionManagement")
     if scope >= 0:
-        match = re.search(r"repositories\\s*\\{", content[scope:])
+        match = re.search(r"repositories\s*\{", content[scope:])
         if not match:
             raise SystemExit("dependencyResolutionManagement repositories block not found.")
         position = scope + match.end()
-        content = content[:position] + '\\n        maven { url = uri("https://jitpack.io") }' + content[position:]
+        content = content[:position] + '\n        maven { url = uri("https://jitpack.io") }' + content[position:]
     else:
-        content += '\\n\\ndependencyResolutionManagement {\\n    repositories {\\n        maven { url = uri("https://jitpack.io") }\\n    }\\n}\\n'
+        content += '\n\ndependencyResolutionManagement {\n    repositories {\n        maven { url = uri("https://jitpack.io") }\n    }\n}\n'
     settings.write_text(content, encoding="utf-8")
 
 configure_jitpack()
