@@ -724,6 +724,10 @@ edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", browser_header
 
 def viewmodel_headers(s):
     s = s.replace(
+        "fun onMediaStreamDetected(mediaUrl: String, title: String?, mimeHint: String? = null) {",
+        "fun onMediaStreamDetected(mediaUrl: String, title: String?, mimeHint: String? = null, requestHeaders: Map<String, String> = emptyMap()) {"
+    )
+    s = s.replace(
         """        if (lower.endsWith(".ts") || lower.endsWith(".m4s") || lower.endsWith(".m3u8") || lower.endsWith(".mpd")) return""",
         """        if (lower.endsWith(".ts") || lower.endsWith(".m4s")) return"""
     )
