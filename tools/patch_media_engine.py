@@ -11,6 +11,62 @@ else:
     target = root / "app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt"
 source = target.read_text(encoding="utf-8")
 
+# Add native NewPipe extraction after direct-file probing and before generic HTML parsing.
+native_anchor = re.compile(
+    r"(probeDirectMediaUrl\\(normalizedUrl, platform, customTitle\\)\\?\\.let \\{ directItem ->"
+    r"\\s*return@withContext MediaExtractionResult\\.Success\\(directItem\\)\\s*\\})"
+)
+if "NewPipeMediaProvider.extract(" not in source:
+    source, count = native_anchor.subn(
+        r"""\\1
+
+            // Native provider first for supported services; yt-dlp remains the broad fallback.
+            NewPipeMediaProvider.extract(normalizedUrl, customTitle, platform)?.let { extractedItem ->
+                return@withContext MediaExtractionResult.Success(extractedItem)
+            }""",
+        source,
+        count=1
+    )
+    if count != 1:
+        raise SystemExit("Could not wire NewPipe provider into MediaExtractorEngine.")
+
+manifest_anchor = """        // Never mistake a login/error HTML page for a downloadable video just because its URL ends in .mp4.
+        if (contentType.startsWith("text/html") || contentType.contains("application/json")) return null"""
+manifest_replacement = """        // HLS/DASH are manifests, not standalone MP4 files; route them to an extractor/remux-capable path.
+        val browserReference = BrowserMediaParser.parse(url, contentType)
+        if (browserReference?.kind == BrowserMediaKind.HLS_MANIFEST ||
+            browserReference?.kind == BrowserMediaKind.DASH_MANIFEST) return null
+
+""" + manifest_anchor
+if "BrowserMediaParser.parse(url, contentType)" not in source:
+    if manifest_anchor not in source:
+        raise SystemExit("Could not wire BrowserMediaParser into direct-media probing.")
+    source = source.replace(manifest_anchor, manifest_replacement, 1)
+
+target.write_text(source, encoding="utf-8")
+
+# NewPipe Extractor is published through JitPack. Add it only to dependency-resolution repositories.
+def configure_jitpack():
+    candidates = [root / "settings.gradle.kts", root / "settings.gradle"]
+    settings = next((p for p in candidates if p.exists()), None)
+    if settings is None:
+        raise SystemExit("Gradle settings file not found; cannot configure NewPipe repository safely.")
+    content = settings.read_text(encoding="utf-8")
+    if "https://jitpack.io" in content:
+        return
+    scope = content.find("dependencyResolutionManagement")
+    if scope >= 0:
+        match = re.search(r"repositories\\s*\\{", content[scope:])
+        if not match:
+            raise SystemExit("dependencyResolutionManagement repositories block not found.")
+        position = scope + match.end()
+        content = content[:position] + '\\n        maven { url = uri("https://jitpack.io") }' + content[position:]
+    else:
+        content += '\\n\\ndependencyResolutionManagement {\\n    repositories {\\n        maven { url = uri("https://jitpack.io") }\\n    }\\n}\\n'
+    settings.write_text(content, encoding="utf-8")
+
+configure_jitpack()
+
 anchor = """            MediaExtractionResult.NeedsSmartBrowser(
                 normalizedUrl = normalizedUrl,
                 platform = platform,
