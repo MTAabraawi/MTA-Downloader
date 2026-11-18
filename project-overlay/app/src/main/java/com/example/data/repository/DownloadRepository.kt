@@ -43,6 +43,7 @@ class DownloadRepository(
     ): Result<Long> = withContext(Dispatchers.IO) {
         runCatching {
             val targetStreamUrl = quality.overrideStreamUrl?.takeIf { it.isNotBlank() } ?: request.streamUrl
+            validateDownloadUrl(targetStreamUrl)
             if (!isDirectMediaUrl(targetStreamUrl)) {
                 return@runCatching downloadWithYtDlp(request, quality, targetStreamUrl)
             }
@@ -82,6 +83,33 @@ class DownloadRepository(
                 thumbnailResId = request.thumbnailRes
             )
             downloadDao.insert(entity)
+        }
+    }
+
+    /**
+     * Accept only absolute HTTPS URLs with a public-looking host. This prevents accidental
+     * handling of file/content/javascript schemes, embedded credentials, and obvious local hosts.
+     */
+    private fun validateDownloadUrl(rawUrl: String) {
+        val uri = Uri.parse(rawUrl.trim())
+        require(uri.scheme.equals("https", ignoreCase = true)) {
+            "لأسباب أمنية، يجب أن يبدأ رابط التنزيل بـ HTTPS"
+        }
+        val host = uri.host?.lowercase()?.trimEnd('.')
+        require(!host.isNullOrBlank()) { "رابط التنزيل لا يحتوي على اسم مضيف صالح" }
+        require(uri.userInfo == null) { "الروابط التي تحتوي بيانات دخول مضمّنة غير مسموحة" }
+        require(host != "localhost" && !host.endsWith(".localhost") && !host.endsWith(".local")) {
+            "لا يمكن تنزيل روابط الأجهزة أو الشبكات المحلية"
+        }
+        if (host.matches(Regex("""\\d{1,3}(\\.\\d{1,3}){3}"""))) {
+            val octets = host.split(".").map { it.toIntOrNull() ?: 256 }
+            require(octets.size == 4 && octets.all { it in 0..255 }) { "عنوان IP غير صالح" }
+            val a = octets[0]
+            val b = octets[1]
+            val isPrivateOrReserved = a == 0 || a == 10 || a == 127 ||
+                (a == 169 && b == 254) || (a == 172 && b in 16..31) ||
+                (a == 192 && b == 168) || a >= 224
+            require(!isPrivateOrReserved) { "لا يمكن تنزيل روابط عناوين IP الخاصة أو المحجوزة" }
         }
     }
 
