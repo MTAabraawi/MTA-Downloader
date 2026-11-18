@@ -446,7 +446,7 @@ def viewmodel_headers(s):
         val safeHeaders = requestHeaders.entries.mapNotNull { (name, value) ->
             val normalized = name.lowercase(Locale.US)
             if (normalized in allowedHeaders && value.length <= 2048 &&
-                !value.contains('\\r') && !value.contains('\\n')) name to value else null
+                !value.contains('\r') && !value.contains('\n')) name to value else null
         }.toMap()
 
         _browserState.update { state ->"""
