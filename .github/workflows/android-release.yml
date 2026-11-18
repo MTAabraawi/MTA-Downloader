@@ -40,7 +40,7 @@ jobs:
           python3 tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt
           python3 tools/patch_runtime_stack.py project
           python3 -m unittest discover -s tools -p 'test_*.py' -v
-          if grep -RInE 'StartApp|StartIo|Start\\.io|210745939|AD_ID|com\\.startapp|rewarded.?ad|RewardDownloadConfirmDialog|rewardDialogState|enqueueDownloadAfterReward' project/app/src/main project/app/build.gradle.kts; then
+          if grep -RInE 'StartApp|StartIo|Start\.io|210745939|AD_ID|com\.startapp|rewarded.?ad|RewardDownloadConfirmDialog|rewardDialogState|enqueueDownloadAfterReward' project/app/src/main project/app/build.gradle.kts; then
             echo "::error::Advertising code or SDK detected in release source"
             exit 1
           fi
