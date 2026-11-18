@@ -359,6 +359,16 @@ def segmented_downloader_testability(s):
     return s
 edit("app/src/main/java/com/example/data/download/SegmentedHttpDownloader.kt", segmented_downloader_testability)
 
+def reject_weak_etag_for_if_range(s):
+    old = """        val validator: String? get() = etag?.takeIf(String::isNotBlank)
+            ?: modified?.takeIf(String::isNotBlank)"""
+    new = """        // If-Range requires a strong ETag; a weak ETag must fall back to Last-Modified.
+        val validator: String? get() = etag?.takeIf {
+            it.isNotBlank() && !it.startsWith("W/", ignoreCase = true)
+        } ?: modified?.takeIf(String::isNotBlank)"""
+    return replace_required(s, old, new, "strong ETag validation for If-Range")
+edit("app/src/main/java/com/example/data/download/SegmentedHttpDownloader.kt", reject_weak_etag_for_if_range)
+
 def recover_orphaned_ytdlp_jobs(s):
     old = """        val interruptedSegments = active.filter {
             it.systemDownloadId == 0L &&
