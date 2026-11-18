@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -62,6 +63,6 @@ fun Media3VideoPlayer(
             }
         },
         update = { it.player = player },
-        modifier = modifier
+        modifier = modifier.fillMaxSize()
     )
 }
