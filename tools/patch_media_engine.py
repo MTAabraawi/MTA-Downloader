@@ -692,7 +692,7 @@ def browser_headers(s):
                                         lower.endsWith(".m4a") ||
                                         accept.contains("video/", true)
                                     ) {
-                                        post { onMediaDetected(reqUrl, view?.title, null, request?.requestHeaders.orEmpty()) }
+                                        post { onMediaDetected(reqUrl, view?.title, null) }
                                     }"""
     new = """                                    val manifestMime = when {
                                         accept.contains("mpegurl", true) -> "application/vnd.apple.mpegurl"
