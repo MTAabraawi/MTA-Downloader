@@ -119,7 +119,7 @@ if ads_dir.exists():
     shutil.rmtree(ads_dir)
 
 # Fail closed if any advertising SDK, identifier, or rewarded-ad gate survives in app source.
-ad_pattern = re.compile(r"StartApp|StartIo|Start\\.io|210745939|AD_ID|com\\.startapp|rewarded.?ad|onVideoCompleted", re.I)
+ad_pattern = re.compile(r"StartApp|StartIo|Start\.io|210745939|AD_ID|com\.startapp|rewarded.?ad|onVideoCompleted", re.I)
 scan_roots = [root / "app/src/main", root / "app/build.gradle.kts"]
 remaining = []
 for base in scan_roots:
@@ -130,5 +130,5 @@ for base in scan_roots:
                 if ad_pattern.search(line):
                     remaining.append(f"{file}:{number}:{line.strip()}")
 if remaining:
-    raise SystemExit("Ad-free invariant failed:\\n" + "\\n".join(remaining))
+    raise SystemExit("Ad-free invariant failed:\n" + "\\n".join(remaining))
 print("Ad-free source transformation and invariant scan passed.")
