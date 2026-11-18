@@ -203,8 +203,11 @@ new_probe = """        // Some CDNs reject HEAD even though a normal media GET i
 """
 if new_probe not in s:
     if old_probe not in s:
-        raise SystemExit("Patch anchor missing: HEAD probe")
-    s = s.replace(old_probe, new_probe, 1)
+        # The later MIME-parameter normalization pass is an equivalent, safer probe.
+        if "Range" not in s or "substringBefore(';')" not in s:
+            raise SystemExit("Patch anchor missing: HEAD probe")
+    else:
+        s = s.replace(old_probe, new_probe, 1)
 
 old_quality = """                    mimeType = if (isAudio) "audio/mpeg" else "video/$ext",
                     overrideStreamUrl = streamUrl
