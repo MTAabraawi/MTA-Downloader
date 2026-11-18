@@ -374,6 +374,93 @@ def fallback(s):
     return s.replace(old, new, 1)
 edit("app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt", fallback)
 
+
+# Carry only non-secret browser request context in memory; never persist cookies or authorization tokens.
+def video_models_headers(s):
+    old = """data class DetectedMediaStream(
+    val url: String,
+    val title: String,
+    val formatLabel: String,
+    val extension: String,
+    val mimeType: String,
+    val detectedAt: Long = System.currentTimeMillis()
+)"""
+    new = """data class DetectedMediaStream(
+    val url: String,
+    val title: String,
+    val formatLabel: String,
+    val extension: String,
+    val mimeType: String,
+    val requestHeaders: Map<String, String> = emptyMap(),
+    val detectedAt: Long = System.currentTimeMillis()
+)"""
+    return replace_required(s, old, new, "DetectedMediaStream request headers")
+edit("app/src/main/java/com/example/data/model/VideoModels.kt", video_models_headers)
+
+def catalog_headers(s):
+    old = """                mimeType = s.mimeType,
+                overrideStreamUrl = s.url
+"""
+    new = """                mimeType = s.mimeType,
+                overrideStreamUrl = s.url,
+                requestHeaders = s.requestHeaders
+"""
+    return replace_required(s, old, new, "captured stream quality headers")
+edit("app/src/main/java/com/example/data/repository/VideoCatalogRepository.kt", catalog_headers)
+
+def browser_headers(s):
+    s = s.replace(
+        "onMediaDetected: (String, String?, String?) -> Unit,",
+        "onMediaDetected: (String, String?, String?, Map<String, String>) -> Unit,"
+    )
+    s = s.replace("onMediaDetected(src, title, mime)", "onMediaDetected(src, title, mime, emptyMap())")
+    s = s.replace("onMediaDetected(url, title, mimetype)", "onMediaDetected(url, title, mimetype, emptyMap())")
+    s = s.replace(
+        "post { onMediaDetected(reqUrl, view?.title, null) }",
+        "post { onMediaDetected(reqUrl, view?.title, null, request?.requestHeaders.orEmpty()) }"
+    )
+    return s
+edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", browser_headers)
+
+def viewmodel_headers(s):
+    s = s.replace(
+        "fun onMediaStreamDetected(mediaUrl: String, title: String?, mimeHint: String? = null) {",
+        "fun onMediaStreamDetected(mediaUrl: String, title: String?, mimeHint: String? = null, requestHeaders: Map<String, String> = emptyMap()) {"
+    )
+    anchor = """        val mime = when {
+            isAudio && ext == "m4a" -> "audio/mp4"
+            isAudio -> "audio/mpeg"
+            ext == "mov" -> "video/quicktime"
+            else -> "video/$ext"
+        }
+
+        _browserState.update { state ->"""
+    replacement = """        val mime = when {
+            isAudio && ext == "m4a" -> "audio/mp4"
+            isAudio -> "audio/mpeg"
+            ext == "mov" -> "video/quicktime"
+            else -> "video/$ext"
+        }
+        // Do not retain Cookie, Authorization, or other credential-bearing headers.
+        val allowedHeaders = setOf("referer", "origin", "user-agent", "accept", "accept-language")
+        val safeHeaders = requestHeaders.entries.mapNotNull { (name, value) ->
+            val normalized = name.lowercase(Locale.US)
+            if (normalized in allowedHeaders && value.length <= 2048 &&
+                !value.contains('\\\\r') && !value.contains('\\\\n')) name to value else null
+        }.toMap()
+
+        _browserState.update { state ->"""
+    s = replace_required(s, anchor, replacement, "browser safe header filtering")
+    old = """                    extension = ext,
+                    mimeType = mime
+"""
+    new = """                    extension = ext,
+                    mimeType = mime,
+                    requestHeaders = safeHeaders
+"""
+    return replace_required(s, old, new, "detected stream safe headers")
+edit("app/src/main/java/com/example/ui/MainViewModel.kt", viewmodel_headers)
+
 # Verify the Android source no longer contains ad SDK IDs, permissions, callbacks, or libraries.
 scan_roots = [root / "app/src/main", root / "app/build.gradle.kts"]
 patterns = re.compile(r"StartApp|StartIo|Start\.io|210745939|AD_ID|onVideoCompleted|com\.startapp|rewarded.?ad", re.I)
