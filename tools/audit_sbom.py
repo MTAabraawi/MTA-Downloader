@@ -37,6 +37,18 @@ def main():
     missing = [c for c in components if license_names(c) == ["NOT_REPORTED"]]
 
     apk_entries = archive_names(args.apk)
+    required_license_assets = [
+        "open-source-licenses/OPEN_SOURCE_LICENSES.txt",
+        "open-source-licenses/DEPENDENCY_SBOM.json",
+        "THIRD-PARTY-NOTICES.txt",
+    ]
+    missing_license_assets = [
+        asset for asset in required_license_assets
+        if not any(entry.endswith(asset) for entry in apk_entries)
+    ]
+    if missing_license_assets:
+        raise SystemExit("Required in-app license asset(s) missing from APK: " + ", ".join(missing_license_assets))
+
     aar_candidates = list(args.gradle_cache.glob(
         "modules-2/files-2.1/dev.ffmpegkit-maintained/yt-dlp-android/2.0.2/**/*.aar"
     ))
@@ -74,7 +86,7 @@ def main():
         "- Components in aggregate SBOM: " + str(len(components)),
         "- Components with no license metadata: " + str(len(missing)),
         "- APK inspected: " + args.apk.name,
-        "- yt-dlp Android AAR candidates found in Gradle cache: " + str(len(aar_candidates)),
+        "- yt-dlp Android AAR candidates found in Gradle cache: " + str(len(aar_candidates)),\n        "- Required in-app license assets present: " + str(len(required_license_assets) - len(missing_license_assets)) + "/" + str(len(required_license_assets)),
         "- Python distributions discovered inside those AARs: " + str(len(python_packages)),
         "",
         "## FFmpeg packaging inspection",
