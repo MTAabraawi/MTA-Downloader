@@ -41,11 +41,19 @@ class MediaExtractionRouterTest {
         assertNull(result)
     }
 
-    @Test(expected = CancellationException::class)
-    fun cancellationIsNotSwallowedByFallbackRouter() = runBlocking {
-        MediaExtractionRouter.firstAvailable<String>(
-            { throw CancellationException("cancel test") },
-            { "must-not-run" }
-        )
+    @Test
+    fun cancellationIsNotSwallowedByFallbackRouter() {
+        var cancellationPropagated = false
+        try {
+            runBlocking {
+                MediaExtractionRouter.firstAvailable<String>(
+                    { throw CancellationException("cancel test") },
+                    { "must-not-run" }
+                )
+            }
+        } catch (_: CancellationException) {
+            cancellationPropagated = true
+        }
+        assertEquals(true, cancellationPropagated)
     }
 }
