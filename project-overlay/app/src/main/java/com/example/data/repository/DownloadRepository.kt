@@ -58,8 +58,10 @@ class DownloadRepository(
         runCatching {
             val targetStreamUrl = quality.overrideStreamUrl?.takeIf { it.isNotBlank() } ?: request.streamUrl
             validateDownloadUrl(targetStreamUrl)
-            if (resumeEntity == null && !isDirectMediaUrl(targetStreamUrl) &&
-                !quality.id.startsWith("newpipe_") && !quality.id.startsWith("captured_")) {
+            val isCapturedManifest = quality.id.startsWith("captured_manifest_")
+            if (resumeEntity == null && (isCapturedManifest ||
+                (!isDirectMediaUrl(targetStreamUrl) &&
+                    !quality.id.startsWith("newpipe_") && !quality.id.startsWith("captured_")))) {
                 return@runCatching downloadWithYtDlp(request, quality, targetStreamUrl)
             }
 
