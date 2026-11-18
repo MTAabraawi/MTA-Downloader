@@ -498,20 +498,37 @@ edit("app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt", fal
 
 # Add a persisted pause state and a non-secret header snapshot for safe segmented resume.
 def download_model(s):
-    old = """enum class DownloadStatus {
+    old_status = """enum class DownloadStatus {
     QUEUED,
     DOWNLOADING,
     COMPLETED,
     FAILED
 }"""
-    new = """enum class DownloadStatus {
+    new_status = """enum class DownloadStatus {
     QUEUED,
     DOWNLOADING,
     PAUSED,
     COMPLETED,
     FAILED
 }"""
-    return replace_required(s, old, new, "DownloadStatus paused state")
+    if old_status in s:
+        s = replace_required(s, old_status, new_status, "DownloadStatus paused state")
+    elif "    PAUSED," not in s:
+        raise SystemExit("DownloadStatus paused state is missing and cannot be patched safely")
+
+    old_quality = """    val overrideStreamUrl: String? = null,
+    val requestHeaders: Map<String, String> = emptyMap()
+)"""
+    new_quality = """    val overrideStreamUrl: String? = null,
+    val requestHeaders: Map<String, String> = emptyMap(),
+    val audioStreamUrl: String? = null,
+    val audioRequestHeaders: Map<String, String> = emptyMap()
+)"""
+    if old_quality in s:
+        s = replace_required(s, old_quality, new_quality, "QualityOption adaptive audio metadata")
+    elif "audioStreamUrl: String?" not in s:
+        raise SystemExit("QualityOption adaptive audio metadata is missing")
+    return s
 edit("app/src/main/java/com/example/data/model/VideoModels.kt", download_model)
 def room_entity_headers(s):
     s = s.replace(
