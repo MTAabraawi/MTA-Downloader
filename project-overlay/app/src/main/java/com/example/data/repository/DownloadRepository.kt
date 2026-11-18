@@ -207,6 +207,7 @@ class DownloadRepository(
             File(outputDir, safeTitle + "_%(id)s.%(ext)s").absolutePath
         }
         val formatSelector = when {
+            quality.id == "subtitles" -> "best"
             quality.id.contains("1080") -> "best[height<=1080]/best"
             quality.id.contains("720") -> "best[height<=720]/best"
             quality.id.contains("480") -> "best[height<=480]/best"
@@ -236,6 +237,14 @@ class DownloadRepository(
             .addOption("--no-warnings")
             .addOption("--newline")
             .addOption("-f", formatSelector)
+        if (quality.id == "subtitles") {
+            ytdlpRequest
+                .addOption("--skip-download")
+                .addOption("--write-subs")
+                .addOption("--write-auto-subs")
+                .addOption("--sub-langs", "all")
+                .addOption("--sub-format", "vtt/best")
+        }
         val progressScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val lastUpdate = AtomicLong(0L)
         val future = YtDlp.executeAsync(
@@ -284,7 +293,7 @@ class DownloadRepository(
         }
 
         val mediaExtensions = setOf(
-            "mp4", "m4v", "webm", "mov", "mkv", "mp3", "m4a", "aac", "wav", "ogg", "opus", "flv", "ts"
+            "mp4", "m4v", "webm", "mov", "mkv", "mp3", "m4a", "aac", "wav", "ogg", "opus", "flv", "ts", "vtt", "srt", "ttml", "srv1", "srv2", "srv3"
         )
         val outputFiles = outputDir.walkTopDown()
             .filter {
