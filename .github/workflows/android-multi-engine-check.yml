@@ -45,6 +45,10 @@ jobs:
           find project/app/src/main/java/com/example/data/extractor -maxdepth 2 -type f -name '*.kt' -print -exec sed -n '1,260p' {} \;
           echo '--- GRADLE CATALOG ---'
           sed -n '1,240p' project/gradle/libs.versions.toml
+          echo '--- DOWNLOAD UI AND VIEWMODEL FILES ---'
+          find project/app/src/main/java/com/example -maxdepth 7 -type f | sort | grep -Ei 'download|viewmodel|screen' | head -200 || true
+          echo '--- DOWNLOAD FLOW REFERENCES ---'
+          grep -RInE 'enqueueDownload|deleteDownload|syncActiveDownloadsProgress|pauseDownload|resumeDownload' project/app/src/main/java/com/example | head -240 || true
           python3 tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt
       - name: Enforce ad-free source invariant
         run: |
