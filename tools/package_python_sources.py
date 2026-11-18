@@ -21,7 +21,7 @@ def main():
     found = set()
     args.output.mkdir(parents=True, exist_ok=True)
     for package in packages:
-        name = package.get("name", "").lower()
+        name = package.get("name", "").lower().replace("_", "-").replace(".", "-")
         version = package.get("version", "")
         if name not in wanted:
             continue
