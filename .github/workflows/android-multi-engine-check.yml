@@ -8,6 +8,10 @@ on:
       - 'project-overlay/**'
       - 'tools/apply_adfree_redesign.py'
       - 'tools/patch_media_engine.py'
+      - 'tools/audit_sbom.py'
+      - 'tools/cyclonedx.init.gradle.kts'
+      - 'THIRD-PARTY-NOTICES.md'
+      - 'docs/**'
       - '.github/workflows/android-multi-engine-check.yml'
 
 permissions:
@@ -70,6 +74,23 @@ jobs:
       - name: Build debug APK
         working-directory: project
         run: gradle --no-daemon --no-configuration-cache assembleDebug
+      - name: Generate CycloneDX SBOM and dependency reports
+        working-directory: project
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --no-configuration-cache --init-script ../tools/cyclonedx.init.gradle.kts cyclonedxBom
+          gradle --no-daemon --no-configuration-cache dependencies --configuration debugRuntimeClasspath > app/build/reports/debugRuntimeClasspath-dependencies.txt
+          gradle --no-daemon --no-configuration-cache dependencyInsight --dependency yt-dlp-android --configuration debugRuntimeClasspath > app/build/reports/yt-dlp-android-dependency-insight.txt
+          gradle --no-daemon --no-configuration-cache dependencyInsight --dependency NewPipeExtractor --configuration debugRuntimeClasspath > app/build/reports/newpipe-dependency-insight.txt
+      - name: Audit SBOM, AAR and APK for licenses and FFmpeg
+        working-directory: project
+        run: |
+          set -euo pipefail
+          python3 ../tools/audit_sbom.py \
+            --bom build/reports/cyclonedx/bom.json \
+            --apk app/build/outputs/apk/debug/app-debug.apk \
+            --gradle-cache "$HOME/.gradle/caches" \
+            --output build/reports/THIRD_PARTY_LICENSE_AUDIT.md
       - name: Upload validation artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -78,6 +99,9 @@ jobs:
           path: |
             project/app/build/outputs/apk/debug/*.apk
             project/app/build/reports/**
+            project/build/reports/cyclonedx/**
+            project/build/reports/cyclonedx-direct/**
+            project/build/reports/THIRD_PARTY_LICENSE_AUDIT.md
             project/app/build/test-results/**
             project/app/src/main/**
             project/app/build.gradle.kts
