@@ -40,7 +40,7 @@ object BrowserMediaParser {
                 path.endsWith(".wav") || path.endsWith(".ogg") || path.endsWith(".opus") ||
                 mime.startsWith("audio/") -> BrowserMediaKind.AUDIO_FILE
             path.endsWith(".mp4") || path.endsWith(".m4v") || path.endsWith(".webm") ||
-                path.endsWith(".mov") || mime.startsWith("video/") -> BrowserMediaKind.VIDEO_FILE
+                path.endsWith(".mov") || path.endsWith(".mkv") || path.endsWith(".flv") || mime.startsWith("video/") -> BrowserMediaKind.VIDEO_FILE
             else -> return null
         }
         val normalizedMime = when (kind) {
