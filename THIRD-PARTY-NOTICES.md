@@ -7,7 +7,7 @@ This inventory distinguishes runtime dependencies from architectural references.
 | Project | Upstream | Role | License reported upstream | Status |
 |---|---|---|---|---|
 | yt-dlp | https://github.com/yt-dlp/yt-dlp | Site extraction core | Unlicense (inspect bundled components separately) | Used through Android wrapper |
-| yt-dlp-android | https://github.com/ffmpegkit-maintained/yt-dlp-android | Android runtime wrapper | MIT | Declared; build verification pending |
+| yt-dlp-android | https://github.com/ffmpegkit-maintained/yt-dlp-android | Android runtime wrapper | MIT | Declared and resolved by CI; transitive license audit pending |
 | NewPipe Extractor v0.27.1 | https://github.com/TeamNewPipe/NewPipeExtractor | Native site extractors for YouTube, SoundCloud, media.ccc.de, PeerTube and Bandcamp | GPL-3.0-or-later | Pinned and wired as native provider; unit tests, lint and debug dex/build passed in CI |
 | QuickTube | https://github.com/devgalib/QuickTube | Reference extraction architecture | GPL-3.0 | Reference only |
 | Seal | https://github.com/JunkFood02/Seal | yt-dlp Android workflow reference | GPL-3.0 | Reference only; do not use Seal branding |
