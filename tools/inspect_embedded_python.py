@@ -30,13 +30,13 @@ def scan_archive(archive, archive_label, packages, relevant_entries, version_hin
                 "metadata_path": full_name,
                 "aar": archive_label,
             })
-        if lower.endswith("/yt_dlp/version.py") or lower.endswith("/yt_dlp/version.pyc"):
+        if lower.endswith("yt_dlp/version.py") or lower.endswith("yt_dlp/version.pyc"):
             if lower.endswith(".py"):
                 source = archive.read(name).decode("utf-8", errors="replace")
                 match = re.search(r"""(?m)^__version__\s*=\s*(['"])([^'"]+)\1""", source)
                 if match:
                     version_hints["yt-dlp"] = match.group(2)
-        if lower.endswith("/certifi/__init__.py"):
+        if lower.endswith("certifi/__init__.py"):
             source = archive.read(name).decode("utf-8", errors="replace")
             match = re.search(r"""(?m)^__version__\s*=\s*(['"])([^'"]+)\1""", source)
             if match:
