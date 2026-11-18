@@ -17,6 +17,12 @@ cp "$REPO_ROOT/LICENSE" "$BUNDLE/"
 cp "$REPO_ROOT/THIRD-PARTY-NOTICES.md" "$BUNDLE/"
 
 git clone --depth 1 --branch v0.27.1 https://github.com/TeamNewPipe/NewPipeExtractor.git "$BUNDLE/upstream/NewPipeExtractor"
+PYTHON_MANIFEST="$REPO_ROOT/project/build/reports/embedded-python-packages.json"
+if [[ -f "$PYTHON_MANIFEST" ]]; then
+  python3 "$REPO_ROOT/tools/package_python_sources.py" --manifest "$PYTHON_MANIFEST" --output "$BUNDLE/upstream/python-sources"
+else
+  echo "WARNING: embedded Python package manifest unavailable; inspect the audit report before release."
+fi
 printf "NewPipe Extractor v0.27.1 commit: %s\\n" "$(git -C "$BUNDLE/upstream/NewPipeExtractor" rev-parse HEAD)" > "$BUNDLE/UPSTREAM-VERSIONS.txt"
 
 cat > "$BUNDLE/BUILDING.md" <<'EOF'
@@ -28,7 +34,7 @@ This source package accompanies the GPL-3.0-or-later MTA Downloader build that u
 - The exact original Android project source archive used by the CI validation workflow.
 - The reviewed project overlay containing MTA-owned integration code, tests, license assets, and app changes.
 - The patch and source-application scripts used to reconstruct the validation source tree.
-- The NewPipe Extractor v0.27.1 upstream source checkout.
+- The NewPipe Extractor v0.27.1 upstream source checkout.\n- Exact yt-dlp and Certifi source distributions when their versions are available in the AAR metadata manifest.
 - The MTA project GPL license and third-party notices.
 
 ## Reconstruct and build
