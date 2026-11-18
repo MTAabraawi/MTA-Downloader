@@ -5,7 +5,7 @@ import sys
 argument = Path(sys.argv[1])
 if argument.is_file():
     target = argument
-    root = target.parents[7]
+    root = target.parents[8]
 else:
     root = argument
     target = root / "app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt"
