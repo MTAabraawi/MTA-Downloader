@@ -17,8 +17,8 @@ if start < 0:
 reason_start = source.rfind("            val reason =", 0, start)
 if reason_start < 0:
     raise SystemExit("Layer 4 reason declaration not found; refusing to patch.")
-line_start = source.rfind("\\n", 0, reason_start) + 1
-line_end = source.find("\\n", start + len(anchor))
+line_start = source.rfind("\n", 0, reason_start) + 1
+line_end = source.find("\n", start + len(anchor))
 if line_end < 0:
     raise SystemExit("Could not find end of Layer 4 fallback; refusing to patch.")
 line_end += 1
@@ -70,20 +70,20 @@ def replace_required(s, old, new, label):
 
 # Remove every ad SDK reference and Android advertising identifier.
 def gradle(s):
-    s = re.sub(r"^.*Start\\.io rewarded ads.*\\n", "", s, flags=re.M)
-    s = re.sub(r"^.*com\\.startapp:inapp-sdk.*\\n", "", s, flags=re.M)
+    s = re.sub(r"^.*Start\.io rewarded ads.*\n", "", s, flags=re.M)
+    s = re.sub(r"^.*com\.startapp:inapp-sdk.*\n", "", s, flags=re.M)
     return s
 edit("app/build.gradle.kts", gradle)
 
 def manifest(s):
-    s = s.replace('    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />\\n', "")
-    s = re.sub(r"\\s*<meta-data\\s+android:name=\"com\\.startapp\\.sdk\\.APPLICATION_ID\"\\s+android:value=\"210745939\"\\s*/>\\s*", "\\n", s)
+    s = s.replace('    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />\n', "")
+    s = re.sub(r"\s*<meta-data\s+android:name=\"com\.startapp\.sdk\.APPLICATION_ID\"\s+android:value=\"210745939\"\s*/>\s*", "\n", s)
     return s
 edit("app/src/main/AndroidManifest.xml", manifest)
 
 def app(s):
-    s = s.replace("import com.startapp.sdk.adsbase.StartAppAd\\n", "")
-    s = s.replace("import com.startapp.sdk.adsbase.StartAppSDK\\n", "")
+    s = s.replace("import com.startapp.sdk.adsbase.StartAppAd\n", "")
+    s = s.replace("import com.startapp.sdk.adsbase.StartAppSDK\n", "")
     block = """        // Preserve the existing Start.io app ID and initialization.
         StartAppSDK.initParams(this, STARTIO_APP_ID)
             .setReturnAdsEnabled(false)
@@ -91,14 +91,14 @@ def app(s):
         StartAppAd.disableSplash()
 """
     s = replace_required(s, block, "", "Start.io application initialization")
-    s = re.sub(r"\\n    companion object \\{\\n        const val STARTIO_APP_ID = \"210745939\"\\n    \\}\\n", "\\n", s)
+    s = re.sub(r"\n    companion object \{\n        const val STARTIO_APP_ID = \"210745939\"\n    \}\n", "\n", s)
     return s
 edit("app/src/main/java/com/example/MTADownloaderApp.kt", app)
 
 # MainViewModel: replace reward gating with a direct user-confirmed download action.
 def viewmodel(s):
-    s = s.replace("import android.app.Activity\\n", "")
-    s = s.replace("import com.example.ads.StartIoRewardedAdManager\\n", "")
+    s = s.replace("import android.app.Activity\n", "")
+    s = s.replace("import com.example.ads.StartIoRewardedAdManager\n", "")
     s = s.replace("RewardDialogState", "DownloadOptionsState")
     s = s.replace("_rewardDialogState", "_downloadOptionsState").replace("rewardDialogState", "downloadOptionsState")
     s = s.replace("dismissRewardConfirmationDialog", "dismissDownloadOptionsDialog")
@@ -143,17 +143,17 @@ edit("app/src/main/java/com/example/ui/MainViewModel.kt", viewmodel)
 # MainActivity: remove rewarded-ad dialogs and use the new format chooser.
 def activity(s):
     for line in [
-        "import com.example.ui.components.AdFailureDialog\\n",
-        "import com.example.ui.components.AdLoadingOverlayDialog\\n",
-        "import com.example.ui.components.RewardDownloadConfirmDialog\\n"
+        "import com.example.ui.components.AdFailureDialog\n",
+        "import com.example.ui.components.AdLoadingOverlayDialog\n",
+        "import com.example.ui.components.RewardDownloadConfirmDialog\n"
     ]:
         s = s.replace(line, "")
-    s = s.replace("import com.example.ui.components.InAppVideoPlayerDialog\\n",
-                  "import com.example.ui.components.InAppVideoPlayerDialog\\nimport com.example.ui.components.DownloadOptionsDialog\\n")
-    s = s.replace("    activity: ComponentActivity,\\n    viewModel: MainViewModel\\n",
-                  "    viewModel: MainViewModel\\n")
-    s = s.replace("                    activity = this,\\n                    viewModel = mainViewModel\\n",
-                  "                    viewModel = mainViewModel\\n")
+    s = s.replace("import com.example.ui.components.InAppVideoPlayerDialog\n",
+                  "import com.example.ui.components.InAppVideoPlayerDialog\nimport com.example.ui.components.DownloadOptionsDialog\n")
+    s = s.replace("    activity: ComponentActivity,\n    viewModel: MainViewModel\n",
+                  "    viewModel: MainViewModel\n")
+    s = s.replace("                    activity = this,\n                    viewModel = mainViewModel\n",
+                  "                    viewModel = mainViewModel\n")
     s = s.replace("rewardDialogState", "downloadOptionsState")
     s = s.replace("viewModel.rewardDialogState", "viewModel.downloadOptionsState")
     a = s.find("    // 1. AlertDialog shown when Download button is tapped")
@@ -187,8 +187,8 @@ def dialogs(s):
     s = s.replace("cancel_reward_ad_button", "cancel_download_button")
     s = s.replace("stringResource(R.string.reward_dialog_confirm)", "\"ابدأ التنزيل\"")
     s = s.replace("stringResource(R.string.reward_dialog_cancel)", "\"إلغاء\"")
-    a = s.find("@Composable\\nfun AdLoadingOverlayDialog()")
-    b = s.find("@Composable\\nfun InAppVideoPlayerDialog(", a)
+    a = s.find("@Composable\nfun AdLoadingOverlayDialog()")
+    b = s.find("@Composable\nfun InAppVideoPlayerDialog(", a)
     if a >= 0 and b >= 0:
         s = s[:a] + s[b:]
     return s
@@ -197,10 +197,10 @@ edit("app/src/main/java/com/example/ui/components/MtaDialogs.kt", dialogs)
 # Remove sample videos with fake titles/metadata and unrelated stock media URLs.
 def catalog(s):
     a = s.find("    fun getFeaturedVideos(): List<VideoItem> = listOf(")
-    b = s.find("\\n    fun buildFromCapturedBrowserStreams(", a)
+    b = s.find("\n    fun buildFromCapturedBrowserStreams(", a)
     if a < 0 or b < 0:
         raise SystemExit("Featured sample-video list not found")
-    return s[:a] + "    // Do not fabricate recommendations: the feed contains only analyzed user links.\\n    fun getFeaturedVideos(): List<VideoItem> = emptyList()\\n" + s[b:]
+    return s[:a] + "    // Do not fabricate recommendations: the feed contains only analyzed user links.\n    fun getFeaturedVideos(): List<VideoItem> = emptyList()\n" + s[b:]
 edit("app/src/main/java/com/example/data/repository/VideoCatalogRepository.kt", catalog)
 
 def home(s):
@@ -214,13 +214,13 @@ edit("app/src/main/java/com/example/ui/screens/HomeScreen.kt", home)
 # Rename repository API to remove the obsolete reward requirement.
 def repo(s):
     s = s.replace("enqueueDownloadAfterReward", "enqueueDownload")
-    s = s.replace("Page URLs are downloaded by the embedded yt-dlp engine. This path is called only from\\n     * enqueueDownload(), after Start.io confirms the rewarded video was completed.",
+    s = s.replace("Page URLs are downloaded by the embedded yt-dlp engine. This path is called only from\n     * enqueueDownload(), after Start.io confirms the rewarded video was completed.",
                   "Page URLs are downloaded by the embedded yt-dlp engine after the user selects a format.")
     return s
 edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", repo)
 
 def strings(s):
-    return re.sub(r"\\s*<string name=\"reward_[^\"]+\">.*?</string>", "", s, flags=re.S)
+    return re.sub(r"\s*<string name=\"reward_[^\"]+\">.*?</string>", "", s, flags=re.S)
 edit("app/src/main/res/values/strings.xml", strings)
 
 # Delete the complete ad SDK integration source so no dead ad code ships.
@@ -231,7 +231,7 @@ if ads_dir.exists():
 
 # Verify the Android source no longer contains ad SDK IDs, permissions, callbacks, or libraries.
 scan_roots = [root / "app/src/main", root / "app/build.gradle.kts"]
-patterns = re.compile(r"StartApp|StartIo|Start\\.io|210745939|AD_ID|onVideoCompleted|com\\.startapp|rewarded.?ad", re.I)
+patterns = re.compile(r"StartApp|StartIo|Start\.io|210745939|AD_ID|onVideoCompleted|com\.startapp|rewarded.?ad", re.I)
 remaining = []
 for base in scan_roots:
     files = [base] if base.is_file() else base.rglob("*")
@@ -241,5 +241,5 @@ for base in scan_roots:
                 if patterns.search(line):
                     remaining.append(f"{f}:{n}:{line.strip()}")
 if remaining:
-    raise SystemExit("Ad-removal verification failed:\\n" + "\\n".join(remaining))
+    raise SystemExit("Ad-removal verification failed:\n" + "\n".join(remaining))
 print("Applied ad-free download flow, removed fabricated recommendations, and passed source ad-reference scan.")
