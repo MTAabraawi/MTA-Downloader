@@ -20,21 +20,19 @@ class MediaExtractionRouterTest {
     }
 
     @Test
-    fun nullAndOrdinaryProviderFailureContinueToNextEngine() = runBlocking {
+    fun nullAndOrdinaryProviderFailureContinueToHtmlParser() = runBlocking {
         val calls = mutableListOf<String>()
         val result = MediaExtractionRouter.firstAvailable<String>(
             { calls += "newpipe"; null },
-            { calls += "html"; throw IllegalStateException("fixture failure") },
-            { calls += "ytdlp"; "fallback-result" }
+            { calls += "html"; throw IllegalStateException("fixture failure") }
         )
-        assertEquals("fallback-result", result)
-        assertEquals(listOf("newpipe", "html", "ytdlp"), calls)
+        assertNull(result)
+        assertEquals(listOf("newpipe", "html"), calls)
     }
 
     @Test
     fun allProvidersUnsupportedReturnsNull() = runBlocking {
         val result = MediaExtractionRouter.firstAvailable<String>(
-            { null },
             { null },
             { null }
         )
