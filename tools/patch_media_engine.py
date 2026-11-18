@@ -1279,6 +1279,11 @@ def use_newpipe_subtitle_mapper(s):
     return replace_required(s, old, new, "testable NewPipe subtitle metadata mapper")
 edit("app/src/main/java/com/example/data/extractor/NewPipeMediaProvider.kt", use_newpipe_subtitle_mapper)
 
+# Remove the orphaned rewarded-ad implementation package as well as its call sites.
+ads_dir = root / "app/src/main/java/com/example/ads"
+if ads_dir.exists():
+    shutil.rmtree(ads_dir)
+
 # Verify the Android source no longer contains ad SDK IDs, permissions, callbacks, or libraries.
 scan_roots = [root / "app/src/main", root / "app/build.gradle.kts"]
 patterns = re.compile(r"StartApp|StartIo|Start\.io|210745939|AD_ID|onVideoCompleted|com\.startapp|rewarded.?ad", re.I)

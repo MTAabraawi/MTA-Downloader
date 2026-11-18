@@ -67,7 +67,6 @@ jobs:
           sed -n '1,240p' project/app/src/main/java/com/example/data/local/DownloadEntity.kt
           python3 tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt
           python3 tools/patch_runtime_stack.py project
-          python3 tools/apply_adfree_redesign.py project
           python3 -m unittest discover -s tools -p 'test_*.py' -v
       - name: Enforce ad-free source invariant
         run: |
