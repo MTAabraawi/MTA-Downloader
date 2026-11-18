@@ -375,6 +375,65 @@ def fallback(s):
 edit("app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt", fallback)
 
 
+
+# Add a persisted pause state and a non-secret header snapshot for safe segmented resume.
+def download_model(s):
+    old = """enum class DownloadStatus {
+    QUEUED,
+    DOWNLOADING,
+    COMPLETED,
+    FAILED
+}"""
+    new = """enum class DownloadStatus {
+    QUEUED,
+    DOWNLOADING,
+    PAUSED,
+    COMPLETED,
+    FAILED
+}"""
+    s = replace_required(s, old, new, "DownloadStatus paused state")
+    old_field = """    val thumbnailResId: Int? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)"""
+    new_field = """    val thumbnailResId: Int? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val requestHeadersJson: String = ""
+)"""
+    return replace_required(s, old_field, new_field, "DownloadEntity request header snapshot")
+edit("app/src/main/java/com/example/data/model/VideoModels.kt", download_model)
+edit("app/src/main/java/com/example/data/local/DownloadEntity.kt", lambda s: replace_required(
+    s,
+    """    val thumbnailResId: Int? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)""",
+    """    val thumbnailResId: Int? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val requestHeadersJson: String = ""
+)""",
+    "Room DownloadEntity requestHeadersJson"
+))
+
+def database_migration(s):
+    s = s.replace("import androidx.room.RoomDatabase\\n",
+                  "import androidx.room.RoomDatabase\\nimport androidx.room.migration.Migration\\nimport androidx.sqlite.db.SupportSQLiteDatabase\\n")
+    s = s.replace("    version = 1,", "    version = 2,")
+    s = s.replace("    companion object {\\n", """    companion object {
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE downloads ADD COLUMN requestHeadersJson TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+""")
+    s = s.replace('''                    "mta_downloader.db"
+                ).build().also { INSTANCE = it }''',
+'''                    "mta_downloader.db"
+                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }''')
+    if "MIGRATION_1_2" not in s or "version = 2" not in s:
+        raise SystemExit("Room v1-to-v2 migration could not be applied.")
+    return s
+edit("app/src/main/java/com/example/data/local/AppDatabase.kt", database_migration)
+
 # Carry only non-secret browser request context in memory; never persist cookies or authorization tokens.
 def video_models_headers(s):
     old = """data class DetectedMediaStream(
