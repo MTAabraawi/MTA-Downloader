@@ -51,6 +51,17 @@ jobs:
           test -s project/my-upload-key.jks
           echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/project/my-upload-key.jks" >> "$GITHUB_ENV"
 
+      - name: Upload extracted source snapshot for code review
+        uses: actions/upload-artifact@v4
+        with:
+          name: MTA-Downloader-extracted-source-review
+          path: |
+            project/app/src/main/**
+            project/app/build.gradle.kts
+            project/gradle/libs.versions.toml
+          if-no-files-found: error
+          retention-days: 3
+
       - name: Run tests and build signed APK and AAB
         env:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
