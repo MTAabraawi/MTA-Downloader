@@ -34,8 +34,8 @@ for import_line in (
 ):
     text = text.replace(import_line, "")
 old_player = re.compile(
-    r"                    AndroidView\(\s*factory = \{ ctx ->\s*"
-    r"VideoView\(ctx\)\.apply \{.*?\n                    \},\s*"
+    r"AndroidView\(\s*factory = \{ ctx ->\s*"
+    r"VideoView\(ctx\)\.apply \{.*?\n\s*\},\s*"
     r"modifier = Modifier\.fillMaxWidth\(\)\s*\)\s*",
     re.S,
 )
