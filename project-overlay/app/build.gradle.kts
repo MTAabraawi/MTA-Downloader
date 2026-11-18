@@ -40,10 +40,11 @@ android {
     debug { signingConfig = signingConfigs.getByName("debug") }
   }
   compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
     isCoreLibraryDesugaringEnabled = true
   }
+  kotlinOptions { jvmTarget = "17" }
   buildFeatures { compose = true; buildConfig = true }
   testOptions { unitTests { isIncludeAndroidResources = true } }
   dependenciesInfo {
