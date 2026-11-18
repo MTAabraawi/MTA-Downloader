@@ -1,6 +1,13 @@
 name: Android Signed Release
 on:
   workflow_dispatch:
+  push:
+    branches: [feature/multi-engine-adfree]
+    paths:
+      - 'project-overlay/**'
+      - 'tools/patch_media_engine.py'
+      - 'tools/patch_runtime_stack.py'
+      - '.github/workflows/android-release.yml'
   pull_request:
     branches: [main, feature/multi-engine-adfree]
 permissions:
