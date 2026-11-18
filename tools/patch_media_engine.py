@@ -345,8 +345,8 @@ edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", ensu
 
 def segmented_downloader_testability(s):
     s = s.replace(
-        "private val parallelism: Int = 4\\n)",
-        "private val parallelism: Int = 4,\\n    private val minimumSegmentedSize: Long = 16L * 1024L * 1024L\\n)"
+        "private val parallelism: Int = 4\n)",
+        "private val parallelism: Int = 4,\n    private val minimumSegmentedSize: Long = 16L * 1024L * 1024L\n)"
     )
     s = s.replace(
         "probe.total <= 16L *  1024L * 1024L",
