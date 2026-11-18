@@ -1,6 +1,7 @@
 package com.example.data.extractor
 
 import org.jsoup.Jsoup
+import java.net.URI
 
 data class HtmlMediaDocument(
     val title: String?,
@@ -23,7 +24,9 @@ internal object HtmlMediaDocumentParser {
 
         val title = meta("og:title")
             ?: document.title().replace(Regex("\\s+"), " ").trim().takeIf { it.isNotEmpty() }?.take(160)
-        val thumbnail = meta("og:image") ?: meta("twitter:image")
+        val thumbnail = (meta("og:image") ?: meta("twitter:image"))?.let { raw ->
+            runCatching { URI(pageUrl).resolve(raw).toString() }.getOrDefault(raw)
+        }
         val streams = document.select("video[src], video source[src], source[src]")
             .mapNotNull { element ->
                 element.absUrl("src").takeIf { it.isNotBlank() }
