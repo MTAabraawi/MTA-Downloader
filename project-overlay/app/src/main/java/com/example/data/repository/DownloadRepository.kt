@@ -153,8 +153,8 @@ class DownloadRepository(
         return headers.filter { (name, value) ->
             name.lowercase(Locale.US) in allowed &&
                 value.length <= 2048 &&
-                !value.contains('\\r') &&
-                !value.contains('\\n')
+                !value.contains('\r') &&
+                !value.contains('\n')
         }
     }
 
