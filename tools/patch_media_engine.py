@@ -343,6 +343,22 @@ def ensure_repo_locale(s):
     return s
 edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", ensure_repo_locale)
 
+def segmented_downloader_testability(s):
+    s = s.replace(
+        "private val parallelism: Int = 4\\n)",
+        "private val parallelism: Int = 4,\\n    private val minimumSegmentedSize: Long = 16L * 1024L * 1024L\\n)"
+    )
+    s = s.replace(
+        "probe.total <= 16L *  1024L * 1024L",
+        "probe.total <= minimumSegmentedSize"
+    )
+    s = s.replace(
+        "probe.total <= 16L * 1024L * 1024L",
+        "probe.total <= minimumSegmentedSize"
+    )
+    return s
+edit("app/src/main/java/com/example/data/download/SegmentedHttpDownloader.kt", segmented_downloader_testability)
+
 def normalize_download_media_types(s):
     s = s.replace(
         '".mp3", ".m4a", ".aac", ".wav", ".ogg", ".vtt"',
