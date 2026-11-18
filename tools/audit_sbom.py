@@ -5,6 +5,7 @@ import json
 import re
 import zipfile
 from pathlib import Path
+from email.parser import Parser
 
 def license_names(component):
     found = []
@@ -40,13 +41,31 @@ def main():
         "modules-2/files-2.1/dev.ffmpegkit-maintained/yt-dlp-android/2.0.2/**/*.aar"
     ))
     aar_entries = []
+    python_packages = []
     for aar in aar_candidates:
-        aar_entries.extend((aar.name + "!/" + name) for name in archive_names(aar))
+        try:
+            with zipfile.ZipFile(aar) as archive:
+                names = archive.namelist()
+                aar_entries.extend((aar.name + "!/" + name) for name in names)
+                for metadata_path in (name for name in names if name.endswith(".dist-info/METADATA")):
+                    metadata = Parser().parsestr(archive.read(metadata_path).decode("utf-8", errors="replace"))
+                    package_license = metadata.get("License-Expression") or metadata.get("License") or "NOT_REPORTED"
+                    classifiers = [value for value in metadata.get_all("Classifier", []) if value.startswith("License ::")]
+                    if package_license == "NOT_REPORTED" and classifiers:
+                        package_license = "; ".join(classifiers)
+                    python_packages.append({
+                        "name": metadata.get("Name", metadata_path.split("/")[-2].removesuffix(".dist-info")),
+                        "version": metadata.get("Version", "unknown"),
+                        "license": package_license,
+                        "metadata": metadata_path,
+                    })
+        except (OSError, zipfile.BadZipFile):
+            continue
 
     ffmpeg_pattern = re.compile(r"(?:^|[/!])(?:lib)?(?:avcodec|avformat|avutil|swresample|swscale|ffmpeg)(?:[._-]|$)|ffmpegkit", re.I)
     apk_ffmpeg = [name for name in apk_entries if ffmpeg_pattern.search(name)]
     aar_ffmpeg = [name for name in aar_entries if ffmpeg_pattern.search(name)]
-    ffmpeg_components = [c for c in components if "ffmpeg" in (c.get("name", "") + " " + c.get("purl", "")).lower()]
+    ffmpeg_components = [c for c in components if "ffmpeg" in c.get("name", "").lower() or "ffmpegkit" in c.get("name", "").lower()]
 
     lines = [
         "# MTA Downloader — dependency and license audit",
@@ -55,7 +74,7 @@ def main():
         "- Components in aggregate SBOM: " + str(len(components)),
         "- Components with no license metadata: " + str(len(missing)),
         "- APK inspected: " + args.apk.name,
-        "- yt-dlp Android AAR candidates found in Gradle cache: " + str(len(aar_candidates)),
+        "- yt-dlp Android AAR candidates found in Gradle cache: " + str(len(aar_candidates)),\n        "- Python distributions discovered inside those AARs: " + str(len(python_packages)),
         "",
         "## FFmpeg packaging inspection",
         "",
@@ -72,6 +91,13 @@ def main():
             "",
             "This is a package-content finding, not proof that runtime code can never invoke an externally supplied FFmpeg executable. The inspected yt-dlp Android wrapper documents an embedded CPython/yt-dlp/Certifi runtime; it does not document bundling FFmpeg.",
         ]
+
+    lines += ["", "## Python distributions discovered inside the yt-dlp Android AAR", "", "| Package | Version | License metadata |", "|---|---:|---|"]
+    if python_packages:
+        for package in sorted(python_packages, key=lambda p: p["name"].lower()):
+            lines.append("| " + package["name"] + " | " + package["version"] + " | " + package["license"].replace("|", "\\|") + " |")
+    else:
+        lines.append("No .dist-info/METADATA records were found in the cached AAR; inspect the AAR contents and upstream packaging manually.")
 
     lines += ["", "## Components and declared licenses", "", "| Component | Version | License metadata |", "|---|---:|---|"]
     for component in components:
@@ -104,7 +130,7 @@ def main():
         "",
         "- This report is a CI-generated inventory, not legal advice or a completed legal opinion.",
         "- Resolve every NOT_REPORTED license and inspect native libraries embedded inside AARs, not just Gradle module names.",
-        "- Extract exact yt-dlp, Certifi, CPython, and Chaquopy versions from the AAR/package metadata and archive their corresponding source/notice materials.",
+        "- Extract exact yt-dlp, Certifi, CPython, and Chaquopy versions from the AAR/package metadata and archive their corresponding source/notice materials. The AAR metadata scan above lists Python distributions where wheel metadata is present.",
         "- NewPipe Extractor is GPL-3.0-or-later. Prepare and publish the corresponding source and build/patch scripts for the shipped binary, and verify the complete app distribution obligations before release.",
         "- Do not claim FFmpeg is shipped unless the final APK/AAR inspection identifies it. If later added, record its exact build flags, enabled codecs/libraries, license mode (LGPL/GPL/nonfree), source revision, modifications, and corresponding source.",
         "- Keep the generated SBOM and this audit report with each release artifact.",
