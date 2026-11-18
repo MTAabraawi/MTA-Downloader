@@ -142,7 +142,6 @@ class DownloadRepository(
                 segmentedTask.await()
             } catch (cancelled: CancellationException) {
                 progressScope.cancel()
-                downloadDao.update(trackedEntity.copy(status = DownloadStatus.PAUSED.name))
                 return@runCatching entityId
             } catch (error: Throwable) {
                 progressScope.cancel()
