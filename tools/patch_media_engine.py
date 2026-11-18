@@ -728,7 +728,7 @@ def catalog_headers(s):
         streams: List<DetectedMediaStream>,
         pageTitle: String,
         platform: String
-    ): VideoItem {
+    ): VideoItem? {
         val parsed = streams.mapIndexedNotNull { idx, stream ->
             val media = MediaExtractionRouter.classifyBrowserMedia(stream.url, stream.mimeType)
                 ?: return@mapIndexedNotNull null
@@ -756,7 +756,8 @@ def catalog_headers(s):
                 requestHeaders = stream.requestHeaders
             )
         }
-        val primary = parsed.firstOrNull()?.first ?: streams.first()
+        if (parsed.isEmpty()) return null
+        val primary = parsed.first().first
         val qualities = parsed.map { it.second }
         return VideoItem(
             id = "captured_" + System.currentTimeMillis(),
@@ -877,6 +878,27 @@ def viewmodel_headers(s):
 """
     return replace_required(s, old_stream, new_stream, "captured stream request headers")
 edit("app/src/main/java/com/example/ui/MainViewModel.kt", viewmodel_headers)
+
+def guard_empty_browser_capture(s):
+    old = """            val videoItem = catalogRepository.buildFromCapturedBrowserStreams(
+                streams = captured,
+                pageTitle = state.pageTitle,
+                platform = platform
+            )
+            val withHeaders = videoItem.copy(qualities = videoItem.qualities.map { quality ->"""
+    new = """            val videoItem = catalogRepository.buildFromCapturedBrowserStreams(
+                streams = captured,
+                pageTitle = state.pageTitle,
+                platform = platform
+            ) ?: run {
+                _snackbarMessage.value = "لم يتم العثور على رابط وسائط آمن وقابل للتنزيل في هذه الصفحة"
+                return
+            }
+            val withHeaders = videoItem.copy(qualities = videoItem.qualities.map { quality ->"""
+    return replace_required(s, old, new, "empty/unsafe browser capture guard")
+edit("app/src/main/java/com/example/ui/MainViewModel.kt", guard_empty_browser_capture)
+
+
 
 # Verify the Android source no longer contains ad SDK IDs, permissions, callbacks, or libraries.
 scan_roots = [root / "app/src/main", root / "app/build.gradle.kts"]
