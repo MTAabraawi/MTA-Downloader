@@ -905,4 +905,41 @@ class ExampleUnitTest {
 }
 ''')
 
+
+# 4) Normalize imports and remove duplicate validation left by earlier patch generations.
+p = root / "app/src/main/java/com/example/ui/screens/BrowserScreen.kt"
+lines = p.read_text().splitlines()
+seen_imports = set()
+normalized = []
+for line in lines:
+    if line.startswith("import "):
+        if line in seen_imports:
+            continue
+        seen_imports.add(line)
+    normalized.append(line)
+p.write_text("\\n".join(normalized) + "\\n")
+
+p = root / "app/src/main/java/com/example/data/repository/DownloadRepository.kt"
+s = p.read_text()
+duplicate_validation = """            val parsedTarget = Uri.parse(targetStreamUrl)
+            require(
+                (parsedTarget.scheme.equals("https", true) || parsedTarget.scheme.equals("http", true)) &&
+                    !parsedTarget.host.isNullOrBlank()
+            ) { "رابط التنزيل غير صالح" }
+            val parsedTarget = Uri.parse(targetStreamUrl)
+            require(
+                (parsedTarget.scheme.equals("https", true) || parsedTarget.scheme.equals("http", true)) &&
+                    !parsedTarget.host.isNullOrBlank()
+            ) { "رابط التنزيل غير صالح" }
+"""
+single_validation = """            val parsedTarget = Uri.parse(targetStreamUrl)
+            require(
+                (parsedTarget.scheme.equals("https", true) || parsedTarget.scheme.equals("http", true)) &&
+                    !parsedTarget.host.isNullOrBlank()
+            ) { "رابط التنزيل غير صالح" }
+"""
+if duplicate_validation in s:
+    s = s.replace(duplicate_validation, single_validation, 1)
+p.write_text(s)
+
 print("Applied DownloadManager reliability hardening and regression tests.")
