@@ -52,17 +52,31 @@ def configure_jitpack():
     if settings is None:
         raise SystemExit("Gradle settings file not found; cannot configure NewPipe repository safely.")
     content = settings.read_text(encoding="utf-8")
-    if "https://jitpack.io" in content:
-        return
     scope = content.find("dependencyResolutionManagement")
     if scope >= 0:
         match = re.search(r"repositories\s*\{", content[scope:])
         if not match:
             raise SystemExit("dependencyResolutionManagement repositories block not found.")
         position = scope + match.end()
-        content = content[:position] + '\n        maven { url = uri("https://jitpack.io") }' + content[position:]
+        additions = []
+        mirror = 'maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }'
+        jitpack = 'maven { url = uri("https://jitpack.io") }'
+        if mirror not in content:
+            additions.append(mirror)
+        if jitpack not in content:
+            additions.append(jitpack)
+        if additions:
+            content = content[:position] + "\n        " + "\n        ".join(additions) + content[position:]
     else:
-        content += '\n\ndependencyResolutionManagement {\n    repositories {\n        maven { url = uri("https://jitpack.io") }\n    }\n}\n'
+        content += """
+
+dependencyResolutionManagement {
+    repositories {
+        maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+"""
     settings.write_text(content, encoding="utf-8")
 
 configure_jitpack()
@@ -70,11 +84,15 @@ configure_jitpack()
 # Avoid unstable Gradle configuration-cache serialization in the archived Android project.
 gradle_properties = root / "gradle.properties"
 gradle_text = gradle_properties.read_text(encoding="utf-8") if gradle_properties.exists() else ""
-if "org.gradle.configuration-cache=" not in gradle_text:
-    gradle_properties.write_text(
-        gradle_text.rstrip() + "\norg.gradle.configuration-cache=false\n",
-        encoding="utf-8"
+if re.search(r"(?m)^\\s*org\\.gradle\\.configuration-cache=", gradle_text):
+    gradle_text = re.sub(
+        r"(?m)^\\s*org\\.gradle\\.configuration-cache=.*$",
+        "org.gradle.configuration-cache=false",
+        gradle_text
     )
+else:
+    gradle_text = gradle_text.rstrip() + "\\norg.gradle.configuration-cache=false\\n"
+gradle_properties.write_text(gradle_text, encoding="utf-8")
 
 anchor = """            MediaExtractionResult.NeedsSmartBrowser(
                 normalizedUrl = normalizedUrl,
