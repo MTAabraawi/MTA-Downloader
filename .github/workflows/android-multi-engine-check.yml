@@ -9,6 +9,7 @@ on:
       - 'tools/apply_adfree_redesign.py'
       - 'tools/patch_media_engine.py'
       - 'tools/audit_sbom.py'
+      - 'tools/inspect_embedded_python.py'
       - 'tools/package_corresponding_source.sh'
       - 'tools/cyclonedx.init.gradle.kts'
       - 'THIRD-PARTY-NOTICES.md'
@@ -80,8 +81,10 @@ jobs:
           gradle --no-daemon --no-configuration-cache :app:dependencies --configuration debugRuntimeClasspath > app/build/reports/debugRuntimeClasspath-dependencies.txt
           gradle --no-daemon --no-configuration-cache :app:dependencyInsight --dependency yt-dlp-android --configuration debugRuntimeClasspath > app/build/reports/yt-dlp-android-dependency-insight.txt
           gradle --no-daemon --no-configuration-cache :app:dependencyInsight --dependency NewPipeExtractor --configuration debugRuntimeClasspath > app/build/reports/newpipe-dependency-insight.txt
+          python3 ../tools/inspect_embedded_python.py --gradle-cache "$HOME/.gradle/caches" --output build/reports/embedded-python-packages.json
           mkdir -p app/src/main/assets/open-source-licenses
           cp build/reports/cyclonedx/bom.json app/src/main/assets/open-source-licenses/DEPENDENCY_SBOM.json
+          cp build/reports/embedded-python-packages.json app/src/main/assets/open-source-licenses/EMBEDDED_PYTHON_PACKAGES.json
       - name: Build debug APK with embedded SBOM
         working-directory: project
         run: gradle --no-daemon --no-configuration-cache assembleDebug
