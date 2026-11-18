@@ -199,7 +199,9 @@ class DownloadRepository(
 
     suspend fun pauseDownload(entity: DownloadEntity): Boolean = withContext(Dispatchers.IO) {
         val task = segmentedJobs[entity.id] ?: return@withContext false
+        if (!task.isActive) return@withContext false
         task.cancel(CancellationException("Paused by user"))
+        task.join()
         downloadDao.update(entity.copy(status = DownloadStatus.PAUSED.name))
         true
     }
@@ -333,7 +335,8 @@ class DownloadRepository(
                 status = DownloadStatus.DOWNLOADING.name,
                 progress = 0,
                 thumbnailUrl = request.thumbnailUrl,
-                thumbnailResId = request.thumbnailRes
+                thumbnailResId = request.thumbnailRes,
+                requestHeadersJson = encodeRequestHeaders(quality.requestHeaders)
             )
         )
         val ytdlpRequest = YtDlpRequest(pageUrl)
@@ -376,7 +379,8 @@ class DownloadRepository(
                                 status = DownloadStatus.DOWNLOADING.name,
                                 progress = percent,
                                 thumbnailUrl = request.thumbnailUrl,
-                                thumbnailResId = request.thumbnailRes
+                                thumbnailResId = request.thumbnailRes,
+                                requestHeadersJson = encodeRequestHeaders(quality.requestHeaders)
                             )
                         )
                     }
@@ -448,6 +452,7 @@ class DownloadRepository(
                         thumbnailUrl = request.thumbnailUrl,
                         thumbnailResId = request.thumbnailRes,
                         localUri = publicUri.toString(),
+                        requestHeadersJson = encodeRequestHeaders(quality.requestHeaders),
                         downloadedBytes = outputFile.length(),
                         totalBytes = outputFile.length()
                     )
@@ -502,8 +507,14 @@ class DownloadRepository(
         val active = downloadDao.getActiveDownloads()
         if (active.isEmpty()) return@withContext false
 
+        // A process restart drops in-memory jobs; completed segments remain on disk and can resume.
+        val interruptedSegments = active.filter {
+            it.systemDownloadId == 0L && it.totalBytes > 0L && segmentedJobs[it.id]?.isActive != true
+        }
+        interruptedSegments.forEach { downloadDao.update(it.copy(status = DownloadStatus.PAUSED.name)) }
+
         val ids = active.map { it.systemDownloadId }.filter { it > 0L }.toLongArray()
-        if (ids.isEmpty()) return@withContext false
+        if (ids.isEmpty()) return@withContext interruptedSegments.isNotEmpty()
 
         val query = DownloadManager.Query().setFilterById(*ids)
         val cursor = downloadManager.query(query)
@@ -559,6 +570,10 @@ class DownloadRepository(
     }
 
     suspend fun deleteDownload(entity: DownloadEntity) = withContext(Dispatchers.IO) {
+        segmentedJobs.remove(entity.id)?.let { task ->
+            task.cancel(CancellationException("Download deleted"))
+            task.join()
+        }
         if (entity.systemDownloadId > 0L) {
             runCatching { downloadManager.remove(entity.systemDownloadId) }
         } else {
