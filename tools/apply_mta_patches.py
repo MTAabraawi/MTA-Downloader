@@ -145,8 +145,12 @@ new = r'''    fun extractFirstUrlFromSharedText(rawText: String): String? {
 '''
 if new not in s:
     if old not in s:
-        raise SystemExit("Patch anchor missing: URL extraction/platform detection")
-    s = s.replace(old, new, 1)
+        # The normalized hostname-boundary implementation from the previous pass
+        # is a valid newer form of this patch and should be left untouched.
+        if not ("fun extractFirstUrlFromSharedText" in s and "fun matches(domain: String)" in s):
+            raise SystemExit("Patch anchor missing: URL extraction/platform detection")
+    else:
+        s = s.replace(old, new, 1)
 
 old_probe = """        runCatching {
             val headReq = Request.Builder()
@@ -213,8 +217,11 @@ new_quality = """                    mimeType = if (isAudio) "audio/mpeg" else "
 """
 if new_quality not in s:
     if old_quality not in s:
-        raise SystemExit("Patch anchor missing: scraped quality headers")
-    s = s.replace(old_quality, new_quality, 1)
+        # A richer MIME mapping may already have these headers in a newer source.
+        if "requestHeaders = mapOf(" not in s:
+            raise SystemExit("Patch anchor missing: scraped quality headers")
+    else:
+        s = s.replace(old_quality, new_quality, 1)
 
 if "private fun resolveMediaUrl(pageUrl: String, rawUrl: String)" not in s:
     anchor = """    private fun extractMetaContent(html: String, propertyName: String): String? {
