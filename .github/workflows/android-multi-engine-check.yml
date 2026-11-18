@@ -80,9 +80,9 @@ jobs:
         run: |
           set -euo pipefail
           gradle --no-daemon --no-configuration-cache --init-script ../tools/cyclonedx.init.gradle.kts cyclonedxBom
-          gradle --no-daemon --no-configuration-cache dependencies --configuration debugRuntimeClasspath > app/build/reports/debugRuntimeClasspath-dependencies.txt
-          gradle --no-daemon --no-configuration-cache dependencyInsight --dependency yt-dlp-android --configuration debugRuntimeClasspath > app/build/reports/yt-dlp-android-dependency-insight.txt
-          gradle --no-daemon --no-configuration-cache dependencyInsight --dependency NewPipeExtractor --configuration debugRuntimeClasspath > app/build/reports/newpipe-dependency-insight.txt
+          gradle --no-daemon --no-configuration-cache :app:dependencies --configuration debugRuntimeClasspath > app/build/reports/debugRuntimeClasspath-dependencies.txt
+          gradle --no-daemon --no-configuration-cache :app:dependencyInsight --dependency yt-dlp-android --configuration debugRuntimeClasspath > app/build/reports/yt-dlp-android-dependency-insight.txt
+          gradle --no-daemon --no-configuration-cache :app:dependencyInsight --dependency NewPipeExtractor --configuration debugRuntimeClasspath > app/build/reports/newpipe-dependency-insight.txt
       - name: Audit SBOM, AAR and APK for licenses and FFmpeg
         working-directory: project
         run: |
