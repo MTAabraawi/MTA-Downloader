@@ -953,6 +953,120 @@ edit("app/src/main/java/com/example/ui/MainViewModel.kt", guard_empty_browser_ca
 
 
 
+
+# Keep extraction fallback ordering explicit and testable. Cancellation must propagate.
+def router_fallback_chain(s):
+    if "suspend fun <T : Any> firstAvailable" in s:
+        return s
+    anchor = "    fun classifyBrowserMedia(url: String, contentType: String? = null): BrowserMediaReference? ="
+    block = """    internal suspend fun <T : Any> firstAvailable(vararg providers: suspend () -> T?): T? {
+        for (provider in providers) {
+            val result = try {
+                provider()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+            if (result != null) return result
+        }
+        return null
+    }
+
+"""
+    if anchor not in s:
+        raise SystemExit("Could not add testable extraction fallback chain.")
+    return s.replace(anchor, block + anchor, 1)
+edit("app/src/main/java/com/example/data/extractor/MediaExtractionRouter.kt", router_fallback_chain)
+
+def engine_fallback_chain(s):
+    old = """            // Native provider first for supported services; yt-dlp remains the broad fallback.
+            MediaExtractionRouter.extract(normalizedUrl, customTitle, platform)?.let { extractedItem ->
+                return@withContext MediaExtractionResult.Success(extractedItem)
+            }
+
+            // Local metadata extraction only. No user-configured third-party extraction server.
+            scrapeHtmlForMedia(normalizedUrl, platform, customTitle)?.let { scrapedItem ->
+                return@withContext MediaExtractionResult.Success(scrapedItem)
+            }"""
+    new = """            // Deterministic provider chain: NewPipe first, then the local HTML metadata parser.
+            // If neither can resolve the page, the caller receives the yt-dlp download fallback below.
+            MediaExtractionRouter.firstAvailable(
+                { MediaExtractionRouter.extract(normalizedUrl, customTitle, platform) },
+                { scrapeHtmlForMedia(normalizedUrl, platform, customTitle) }
+            )?.let { extractedItem ->
+                return@withContext MediaExtractionResult.Success(extractedItem)
+            }"""
+    if new in s:
+        return s
+    return replace_required(s, old, new, "explicit NewPipe -> HTML -> yt-dlp extraction fallback chain")
+edit("app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt", engine_fallback_chain)
+
+def newpipe_cancellation(s):
+    if "catch (cancelled: kotlinx.coroutines.CancellationException)" in s:
+        return s
+    old = """        return runCatching {
+            ensureInitialized()"""
+    new = """        return try {
+            ensureInitialized()"""
+    s = replace_required(s, old, new, "NewPipe cancellation-safe extraction start")
+    old_end = """        }.getOrNull()
+    }
+}"""
+    new_end = """        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
+    }
+}"""
+    return replace_required(s, old_end, new_end, "NewPipe cancellation propagation")
+edit("app/src/main/java/com/example/data/extractor/NewPipeMediaProvider.kt", newpipe_cancellation)
+
+def wire_ytdlp_planner(s):
+    if "YtDlpCommandPlanner" not in s:
+        s = s.replace(
+            "import com.example.data.download.SegmentedHttpDownloader",
+            "import com.example.data.download.SegmentedHttpDownloader\nimport com.example.data.download.YtDlpCommandPlanner",
+            1
+        )
+    old_playlist = """        val isPlaylist = Uri.parse(pageUrl).getQueryParameter("list")?.isNotBlank() == true ||
+            Uri.parse(pageUrl).path.orEmpty().contains("/playlist", ignoreCase = true) ||
+            Uri.parse(pageUrl).path.orEmpty().contains("/showcase/", ignoreCase = true)"""
+    s = replace_required(s, old_playlist, "        val isPlaylist = YtDlpCommandPlanner.isPlaylistUrl(pageUrl)", "shared playlist URL detection")
+    old_format = """        val formatSelector = when {
+            quality.id == "subtitles" -> "best"
+            quality.id.contains("1080") -> "best[height<=1080]/best"
+            quality.id.contains("720") -> "best[height<=720]/best"
+            quality.id.contains("480") -> "best[height<=480]/best"
+            quality.id.contains("360") -> "best[height<=360]/best"
+            quality.id.equals("m4a", true) || quality.mimeType.startsWith("audio/") ->
+                "bestaudio[ext=m4a]/bestaudio"
+            else -> "best"
+        }"""
+    s = replace_required(s, old_format, "        val formatSelector = YtDlpCommandPlanner.formatSelector(quality.id, quality.mimeType)", "shared yt-dlp format selection")
+    old_request = """        val ytdlpRequest = YtDlpRequest(pageUrl)
+            .setOutputTemplate(outputTemplate)
+            .addOption(if (isPlaylist) "--yes-playlist" else "--no-playlist")
+            .addOption("--no-warnings")
+            .addOption("--newline")
+            .addOption("-f", formatSelector)
+        if (quality.id == "subtitles") {
+            ytdlpRequest
+                .addOption("--skip-download")
+                .addOption("--write-subs")
+                .addOption("--write-auto-subs")
+                .addOption("--sub-langs", "all")
+                .addOption("--sub-format", "vtt/best")
+        }"""
+    new_request = """        val ytdlpRequest = YtDlpRequest(pageUrl).setOutputTemplate(outputTemplate)
+        YtDlpCommandPlanner.buildOptions(quality.id, quality.mimeType, isPlaylist).forEach { (option, value) ->
+            if (value == null) ytdlpRequest.addOption(option) else ytdlpRequest.addOption(option, value)
+        }"""
+    s = replace_required(s, old_request, new_request, "shared yt-dlp playlist/subtitle command options")
+    return s
+edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", wire_ytdlp_planner)
+
 # Verify the Android source no longer contains ad SDK IDs, permissions, callbacks, or libraries.
 scan_roots = [root / "app/src/main", root / "app/build.gradle.kts"]
 patterns = re.compile(r"StartApp|StartIo|Start\.io|210745939|AD_ID|onVideoCompleted|com\.startapp|rewarded.?ad", re.I)
