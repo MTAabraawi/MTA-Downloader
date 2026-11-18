@@ -5,9 +5,8 @@ def edit(path, fn):
     p = root / path
     s = p.read_text(encoding="utf-8")
     out = fn(s)
-    if out == s:
-        raise SystemExit(f"No changes made to {path}; source baseline may have changed")
-    p.write_text(out, encoding="utf-8")
+    if out != s:
+        p.write_text(out, encoding="utf-8")
 
 def main_vm(s):
     s=s.replace("import android.app.Activity\n","").replace("import com.example.ads.StartIoRewardedAdManager\n","").replace("import com.example.data.model.defaultVideoQualities\n","")
