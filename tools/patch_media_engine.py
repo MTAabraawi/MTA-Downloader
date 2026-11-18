@@ -582,7 +582,7 @@ def downloads_screen_pause_resume(s):
                     }
                     DownloadStatus.DOWNLOADING -> {
                         if (item.systemDownloadId == 0L && item.totalBytes > 0L) {
-                            IconButton(onClick = onPauseClick, modifier = Modifier.testTag("pause_download_\${item.id}")) {
+                            IconButton(onClick = onPauseClick, modifier = Modifier.testTag("pause_download_" + item.id)) {
                                 Icon(imageVector = Icons.Filled.Pause, contentDescription = "إيقاف مؤقت", tint = MtaCyanGlow)
                             }
                         }
