@@ -2,6 +2,9 @@ package com.example.data.repository
 
 import android.app.DownloadManager
 import android.content.Context
+import android.content.ContentValues
+import android.os.Build
+import android.provider.MediaStore
 import android.net.Uri
 import android.os.Environment
 import com.example.data.local.DownloadDao
@@ -14,7 +17,13 @@ import dev.ffmpegkit_maintained.ytdlp.YtDlp
 import dev.ffmpegkit_maintained.ytdlp.YtDlpRequest
 import java.io.File
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
@@ -99,11 +108,8 @@ class DownloadRepository(
         val startedAt = System.currentTimeMillis()
         val safeTitle = request.title
             .replace(Regex("[^a-zA-Z0-9\\u0600-\\u06FF._ -]"), "_")
-            .trim()
-            .take(60)
-            .ifBlank { "mta_video" }
+            .trim().take(60).ifBlank { "mta_video" }
         val outputTemplate = File(outputDir, "${safeTitle}_%(id)s.%(ext)s").absolutePath
-
         val formatSelector = when {
             quality.id.contains("1080") -> "best[height<=1080]/best"
             quality.id.contains("720") -> "best[height<=720]/best"
@@ -113,44 +119,132 @@ class DownloadRepository(
                 "bestaudio[ext=m4a]/bestaudio"
             else -> "best"
         }
-        val ytdlpRequest = YtDlpRequest(pageUrl)
-            .setOutputTemplate(outputTemplate)
-            .addOption("--no-playlist")
-            .addOption("--no-warnings")
-            .addOption("-f", formatSelector)
-
-        val response = YtDlp.executeAsync(
-            ytdlpRequest,
-            DownloadProgressCallback { _, _, _ -> }
-        ).get(45, TimeUnit.MINUTES)
-
-        check(response.isSuccess) {
-            "yt-dlp تعذر استخراج/تنزيل الوسائط (رمز ${response.exitCode})"
-        }
-
-        val outputFile = outputDir.listFiles()
-            ?.filter { it.isFile && it.length() > 0L && it.lastModified() >= startedAt - 2_000L }
-            ?.maxByOrNull { it.lastModified() }
-            ?: error("انتهى محرك التنزيل دون العثور على ملف ناتج")
-
-        return downloadDao.insert(
+        val entityId = downloadDao.insert(
             DownloadEntity(
                 systemDownloadId = 0L,
                 title = request.title,
                 sourceUrl = pageUrl,
                 sourcePlatform = request.sourcePlatform,
                 qualityLabel = quality.label,
-                format = outputFile.extension.uppercase(),
-                fileName = outputFile.name,
-                localUri = Uri.fromFile(outputFile).toString(),
-                status = DownloadStatus.COMPLETED.name,
-                progress = 100,
-                downloadedBytes = outputFile.length(),
-                totalBytes = outputFile.length(),
+                format = quality.format,
+                fileName = "$safeTitle.pending",
+                status = DownloadStatus.DOWNLOADING.name,
+                progress = 0,
                 thumbnailUrl = request.thumbnailUrl,
                 thumbnailResId = request.thumbnailRes
             )
         )
+        val ytdlpRequest = YtDlpRequest(pageUrl)
+            .setOutputTemplate(outputTemplate)
+            .addOption("--no-playlist")
+            .addOption("--no-warnings")
+            .addOption("--newline")
+            .addOption("-f", formatSelector)
+        val progressScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val lastUpdate = AtomicLong(0L)
+        val future = YtDlp.executeAsync(
+            ytdlpRequest,
+            DownloadProgressCallback { progress, _, _ ->
+                val now = System.currentTimeMillis()
+                if (now - lastUpdate.get() >= 900L && lastUpdate.getAndSet(now) <= now) {
+                    val percent = progress.toInt().coerceIn(0, 99)
+                    progressScope.launch {
+                        val current = downloadDao.observeAllDownloads()
+                        // The Room flow is not collected here; update the known row directly.
+                        downloadDao.update(
+                            DownloadEntity(
+                                id = entityId,
+                                systemDownloadId = 0L,
+                                title = request.title,
+                                sourceUrl = pageUrl,
+                                sourcePlatform = request.sourcePlatform,
+                                qualityLabel = quality.label,
+                                format = quality.format,
+                                fileName = "$safeTitle.pending",
+                                status = DownloadStatus.DOWNLOADING.name,
+                                progress = percent,
+                                thumbnailUrl = request.thumbnailUrl,
+                                thumbnailResId = request.thumbnailRes
+                            )
+                        )
+                    }
+                }
+            }
+        )
+        try {
+            val response = runInterruptible(Dispatchers.IO) {
+                future.get(45, TimeUnit.MINUTES)
+            }
+            check(response.isSuccess) {
+                "yt-dlp تعذر استخراج/تنزيل الوسائط (رمز ${response.exitCode})"
+            }
+        } catch (error: Throwable) {
+            future.cancel(true)
+            downloadDao.getActiveDownloads().firstOrNull { it.id == entityId }?.let {
+                downloadDao.update(it.copy(status = DownloadStatus.FAILED.name))
+            }
+            throw error
+        } finally {
+            progressScope.cancel()
+        }
+
+        val outputFile = outputDir.listFiles()
+            ?.filter { it.isFile && it.length() > 0L && it.lastModified() >= startedAt - 2_000L }
+            ?.maxByOrNull { it.lastModified() }
+            ?: error("انتهى محرك التنزيل دون العثور على ملف ناتج")
+        val publicUri = publishToDownloads(outputFile, request.title)
+        val completed = downloadDao.getActiveDownloads().firstOrNull { it.id == entityId }
+            ?: error("تعذر العثور على سجل التنزيل")
+        downloadDao.update(
+            completed.copy(
+                format = outputFile.extension.uppercase(),
+                fileName = outputFile.name,
+                localUri = publicUri.toString(),
+                status = DownloadStatus.COMPLETED.name,
+                progress = 100,
+                downloadedBytes = outputFile.length(),
+                totalBytes = outputFile.length()
+            )
+        )
+        outputFile.delete()
+        return entityId
+    }
+
+    private fun publishToDownloads(source: File, title: String): Uri {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return Uri.fromFile(source)
+        }
+        val mime = when (source.extension.lowercase()) {
+            "mp4", "m4v" -> "video/mp4"
+            "webm" -> "video/webm"
+            "mp3" -> "audio/mpeg"
+            "m4a" -> "audio/mp4"
+            "opus" -> "audio/opus"
+            "mkv" -> "video/x-matroska"
+            else -> "application/octet-stream"
+        }
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, source.name)
+            put(MediaStore.MediaColumns.MIME_TYPE, mime)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/MTA_Downloader")
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+        val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val destination = requireNotNull(context.contentResolver.insert(collection, values)) {
+            "تعذر إنشاء ملف في مجلد التنزيلات"
+        }
+        try {
+            context.contentResolver.openOutputStream(destination, "w").use { output ->
+                requireNotNull(output) { "تعذر فتح ملف التنزيلات" }
+                source.inputStream().use { input -> input.copyTo(output) }
+            }
+            val ready = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
+            context.contentResolver.update(destination, ready, null, null)
+            return destination
+        } catch (error: Throwable) {
+            context.contentResolver.delete(destination, null, null)
+            throw error
+        }
     }
 
     suspend fun syncActiveDownloadsProgress(): Boolean = withContext(Dispatchers.IO) {
@@ -219,7 +313,8 @@ class DownloadRepository(
             entity.localUri?.let { uri ->
                 runCatching {
                     val parsed = Uri.parse(uri)
-                    if (parsed.scheme == "file") File(parsed.path.orEmpty()).delete()
+                    if (parsed.scheme == "content") context.contentResolver.delete(parsed, null, null)
+                    else if (parsed.scheme == "file") File(parsed.path.orEmpty()).delete()
                 }
             }
         }
