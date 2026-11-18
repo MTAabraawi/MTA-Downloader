@@ -46,7 +46,21 @@ Keep GPL-3.0-or-later and provide corresponding source and notices for shipped c
 
 ## Status at this commit
 
-- Existing: yt-dlp Android dependency and initialization in the overlay; baseline ZIP remains unchanged.
-- Corrected: removed Start.io dependency, app-ID metadata, AD_ID permission and SDK initialization from the overlay; renamed the repository download method to remove the rewarded-ad requirement.
-- Not yet complete: audit/remove all ad references from extracted baseline and every patch script; implement and wire BrowserMediaParser, NewPipeProvider, router and resumable download manager; add tests and validate CI.
-- No NewPipe provider, XDM-style segmented manager, physical device test or release artifact is claimed complete until implemented and verified.
+- **Ad-free invariant:** the CI source scan passes. Start.io/StartApp dependency, app ID metadata, AD_ID permission and initialization are absent from the assembled source; the download flow no longer has a rewarded-ad gate.
+- **NewPipe Extractor v0.27.1:** pinned and integrated as a native provider for supported services, with an OkHttp downloader adapter. Java/Kotlin bytecode targets are aligned to Java 17, as required by this release line.
+- **MediaExtractionRouter:** native provider requests are bounded by a timeout and duplicate URL requests are serialized with a short-lived result cache. Unsupported URLs continue through the existing page parser and yt-dlp fallback.
+- **BrowserMediaParser:** direct video/audio files are classified separately from HLS/DASH manifests. Manifests are not passed to the direct-file downloader as if they were MP4 files.
+- **Subtitles:** NewPipe subtitle streams are exposed as selectable formats; yt-dlp fallback has a subtitle-only option for normal and automatic subtitles in VTT/best format.
+- **Playlists:** yt-dlp is switched to playlist mode when a playlist URL is detected. Output files are enumerated recursively and each completed media item receives its own download-history row.
+- **Large direct downloads:** the segmented downloader uses bounded 8 MiB ranges, up to four parallel segments, strict Content-Range checks, ETag/Last-Modified validation, three retries and a durable checkpoint. It is selected only for large files whose origin supports validated ranges; otherwise Android DownloadManager remains the fallback.
+- **CI verification:** unit tests, lint and assembleDebug all passed in run [44332978517](https://github.com/MTAabraawi/MTA-Downloader/actions/runs/44332978517). This was a CI validation build only, not a release or a device-test package.
+- **Still outstanding:** explicit pause/resume controls and a durable user-visible queue; restoring browser-captured request headers/cookies safely for protected-by-session public streams; broader provider coverage and real service fixture tests; SBOM/transitive license review and open-source notices UI; release build and signing review.
+- **No physical-device testing or user APK testing has been performed.** Per the agreed sequence, do not ask the user to install a version until the complete integration is finished and the final merge is approved.
+
+## Next implementation order
+
+1. Complete explicit queue, pause/resume and restart recovery around the segmented engine without replacing existing DownloadManager behavior.
+2. Carry only necessary, user-session browser headers into supported downloads, with secure handling and no credential logging.
+3. Add deterministic tests for playlist item accounting, subtitle outputs, router fallback/cancellation and range-resume recovery.
+4. Complete dependency/SBOM and GPL source-distribution review.
+5. Run full CI on the final branch state; only then prepare a single consolidated build for the post-merge test stage.
