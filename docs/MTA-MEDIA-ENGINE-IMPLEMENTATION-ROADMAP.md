@@ -16,7 +16,7 @@ The requested upstream projects are not all drop-in Android libraries.
 | Seal | Android reference implementation for yt-dlp | GPL-3.0; use as reference, not as an additional engine. |
 | XDM (itsolaph/xdm) | Reference for segmented/resumable downloads and browser capture | GPL-3.0-or-later; uses NewPipe Extractor. |
 
-**Updated Android wrapper evaluation (2026-11-18):** `ffmpegkit-maintained/yt-dlp-android` v2.0.2 is published on Maven Central under MIT. Its AAR embeds CPython 3.13 through Chaquopy and yt-dlp, is approximately 60–80 MB, supports arm64-v8a and x86_64, and does not include TLS fingerprint impersonation. It is a candidate adapter, not yet integrated. Its full transitive SBOM, bundled notices, Python package provenance, and APK/AAB size impact must be checked in CI before adoption. Do not enable or add any impersonation feature.
+**Integrated first-stage Android wrapper (2026-11-18):** `dev.ffmpegkit-maintained:yt-dlp-android:2.0.2` is now added through the source overlay on the feature branch. It embeds CPython 3.13 through Chaquopy and yt-dlp, supports arm64-v8a and x86_64, and the free build does not include TLS fingerprint impersonation. Page URLs now route to the on-device yt-dlp download path after the existing rewarded-ad callback. The build, SBOM, dependency notices, and device behavior are still unverified; do not merge or ship until CI and device validation pass.
 
 **Owner approval recorded (2026-11-18):** the owner approved distributing MTA Downloader under GPL-3.0-compatible terms and publishing the corresponding source and notices. This approval permits proceeding with the licensing migration, subject to preserving third-party notices and separately reviewing every bundled component.
 
