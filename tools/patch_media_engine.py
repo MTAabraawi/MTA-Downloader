@@ -675,12 +675,8 @@ edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", browser_header
 
 def viewmodel_headers(s):
     s = s.replace(
-        "fun onMediaStreamDetected(mediaUrl: String, title: String?, mimeHint: String? = null, requestHeaders: Map<String, String> = emptyMap()) {",
-        "fun onMediaStreamDetected(mediaUrl: String, title: String?, mimeHint: String? = null, requestHeaders: Map<String, String> = emptyMap()) {"
-    )
-    s = s.replace(
-        "        if (lower.endsWith(".ts") || lower.endsWith(".m4s") || lower.endsWith(".m3u8") || lower.endsWith(".mpd")) return",
-        "        if (lower.endsWith(".ts") || lower.endsWith(".m4s")) return"
+        """        if (lower.endsWith(".ts") || lower.endsWith(".m4s") || lower.endsWith(".m3u8") || lower.endsWith(".mpd")) return""",
+        """        if (lower.endsWith(".ts") || lower.endsWith(".m4s")) return"""
     )
     old_ext = """        val ext = when {
             lower.endsWith(".mp3") || mimeHint?.contains("audio/mpeg", true) == true -> "mp3"
@@ -719,19 +715,27 @@ def viewmodel_headers(s):
             else -> "video/$ext"
         }"""
     s = replace_required(s, old_ext, new_ext, "browser HLS/DASH media metadata")
-    anchor = """        val mime = when {
-            ext == "m3u8" -> "application/vnd.apple.mpegurl"
-            ext == "mpd" -> "application/dash+xml"
-            isAudio && ext == "m4a" -> "audio/mp4"
-            isAudio -> "audio/mpeg"
-            ext == "mov" -> "video/quicktime"
-            else -> "video/$ext"
-        }
+    old_headers = """        _browserState.update { state ->
+            if (state.detectedStreams.any { it.url == mediaUrl }) {"""
+    new_headers = """        // Do not retain Cookie, Authorization, or other credential-bearing headers.
+        val allowedHeaders = setOf("referer", "origin", "user-agent", "accept", "accept-language")
+        val safeHeaders = requestHeaders.entries.mapNotNull { (name, value) ->
+            val normalized = name.lowercase(Locale.US)
+            if (normalized in allowedHeaders && value.length <= 2048 &&
+                !value.contains('\\r') && !value.contains('\\n')) name to value else null
+        }.toMap()
 
-        // Do not retain Cookie"""
-    if anchor not in s:
-        raise SystemExit("Browser MIME block for header filtering was not found.")
-    return s
+        _browserState.update { state ->
+            if (state.detectedStreams.any { it.url == mediaUrl }) {"""
+    s = replace_required(s, old_headers, new_headers, "browser safe header filtering")
+    old_stream = """                    extension = ext,
+                    mimeType = mime
+"""
+    new_stream = """                    extension = ext,
+                    mimeType = mime,
+                    requestHeaders = safeHeaders
+"""
+    return replace_required(s, old_stream, new_stream, "captured stream request headers")
 edit("app/src/main/java/com/example/ui/MainViewModel.kt", viewmodel_headers)
 
 # Verify the Android source no longer contains ad SDK IDs, permissions, callbacks, or libraries.
