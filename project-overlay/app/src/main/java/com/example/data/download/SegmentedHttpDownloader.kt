@@ -168,7 +168,6 @@ class SegmentedHttpDownloader(
                     }
                     expectedTotal = range.third
                 } else {
-                    // A server that ignores Range (HTTP 200) is safely restarted from byte zero.
                     offset = 0L
                     expectedTotal = body.contentLength()
                     validator = responseValidator
@@ -181,9 +180,7 @@ class SegmentedHttpDownloader(
                         setProperty("total", expectedTotal.toString())
                     }
                     FileOutputStream(metadata).use { props.store(it, "MTA adaptive stream resume") }
-                } else {
-                    metadata.delete()
-                }
+                } else metadata.delete()
                 var downloaded = offset
                 FileOutputStream(temporary, append).use { output ->
                     body.byteStream().use { input ->
@@ -208,10 +205,8 @@ class SegmentedHttpDownloader(
             metadata.delete()
             destination
         } catch (error: Throwable) {
-            // Keep only validator-backed partial bytes; otherwise they cannot be resumed safely.
             if (validator == null || !temporary.isFile || temporary.length() <= 0L) {
-                temporary.delete()
-                metadata.delete()
+                temporary.delete(); metadata.delete()
             }
             throw error
         } finally { cancellation?.dispose() }

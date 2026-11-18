@@ -2,7 +2,7 @@ name: Android Signed Release
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main, feature/mta-unified-media-engine]
+    branches: [main, feature/multi-engine-adfree]
 permissions:
   contents: read
 jobs:
