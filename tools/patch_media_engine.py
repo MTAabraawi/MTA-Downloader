@@ -13,10 +13,22 @@ start = source.find(anchor)
 if start < 0:
     raise SystemExit("Exact Layer 4 NeedsSmartBrowser fallback block not found; refusing to patch.")
 
-replacement = """            MediaExtractionResult.Success(
+# Replace the complete Layer 4 reason + result expression, preserving the function body.
+reason_start = source.rfind("            val reason =", 0, start)
+if reason_start < 0:
+    raise SystemExit("Layer 4 reason declaration not found; refusing to patch.")
+line_start = source.rfind(chr(10), 0, reason_start) + 1
+line_end = source.find(chr(10), start + len(anchor))
+if line_end < 0:
+    raise SystemExit("Could not find end of Layer 4 fallback; refusing to patch.")
+line_end += 1
+
+replacement = """            // Layer 4: pass unresolved page URLs to the on-device yt-dlp engine.
+            // The rewarded-ad gate remains in MainViewModel before the repository starts.
+            return@withContext MediaExtractionResult.Success(
                 VideoItem(
-                    id = "page_\u0024{System.currentTimeMillis()}",
-                    title = customTitle?.takeIf { it.isNotBlank() } ?: "وسائط من \u0024platform",
+                    id = "page_${System.currentTimeMillis()}",
+                    title = customTitle?.takeIf { it.isNotBlank() } ?: "وسائط من $platform",
                     channelName = platform,
                     channelInitial = platform.firstOrNull()?.uppercase() ?: "M",
                     views = "سيتم تحديد الحجم",
@@ -39,7 +51,7 @@ replacement = """            MediaExtractionResult.Success(
                         )
                     )
                 )
-            )"""
-source = source[:start] + replacement + source[start + len(anchor):]
-target.write_text(source, encoding="utf-8")
-print("Patched only the exact Layer 4 fallback call.")
+            )
+"""
+target.write_text(source[:line_start] + replacement + source[line_end:], encoding="utf-8")
+print("Patched Layer 4 fallback safely.")
