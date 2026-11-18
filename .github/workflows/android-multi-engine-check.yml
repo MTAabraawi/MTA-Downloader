@@ -65,11 +65,11 @@ jobs:
       - name: Run unit tests and lint
         working-directory: project
         run: |
-          gradle --no-daemon testDebugUnitTest
-          gradle --no-daemon lint
+          gradle --no-daemon --no-configuration-cache testDebugUnitTest
+          gradle --no-daemon --no-configuration-cache lint
       - name: Build debug APK
         working-directory: project
-        run: gradle --no-daemon assembleDebug
+        run: gradle --no-daemon --no-configuration-cache assembleDebug
       - name: Upload validation artifacts
         if: always()
         uses: actions/upload-artifact@v4
