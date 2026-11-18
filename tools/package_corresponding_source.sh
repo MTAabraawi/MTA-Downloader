@@ -17,6 +17,7 @@ cp "$REPO_ROOT/LICENSE" "$BUNDLE/"
 cp "$REPO_ROOT/THIRD-PARTY-NOTICES.md" "$BUNDLE/"
 
 git clone --depth 1 --branch v0.27.1 https://github.com/TeamNewPipe/NewPipeExtractor.git "$BUNDLE/upstream/NewPipeExtractor"
+printf "NewPipe Extractor v0.27.1 commit: %s\\n" "$(git -C "$BUNDLE/upstream/NewPipeExtractor" rev-parse HEAD)" > "$BUNDLE/UPSTREAM-VERSIONS.txt"
 
 cat > "$BUNDLE/BUILDING.md" <<'EOF'
 # MTA Downloader corresponding source package
@@ -36,7 +37,7 @@ This source package accompanies the GPL-3.0-or-later MTA Downloader build that u
 3. Copy the included project-overlay contents into project/.
 4. Run python3 tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt from the package root.
 5. Build from the reconstructed project directory with gradle --no-daemon testDebugUnitTest lint assembleDebug.
-6. For a CycloneDX inventory, use the included tools/cyclonedx.init.gradle.kts init script and run gradle --init-script tools/cyclonedx.init.gradle.kts cyclonedxBom from the reconstructed project root (adjust the relative path if the package is moved).
+6. For a CycloneDX inventory, run gradle --init-script ../tools/cyclonedx.init.gradle.kts cyclonedxBom from the reconstructed project root.
 
 No production signing key or secrets are included. CI debug artifacts are validation-only.
 EOF
