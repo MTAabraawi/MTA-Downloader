@@ -39,6 +39,12 @@ jobs:
           mkdir project
           unzip -q mta-downloader-nov-17-2026-10-15-48-pm.zip -d project
           cp -a project-overlay/. project/
+          echo '--- SOURCE INVENTORY ---'
+          find project/app/src/main/java/com/example/data -maxdepth 4 -type f | sort | head -120
+          echo '--- EXTRACTOR SOURCES ---'
+          find project/app/src/main/java/com/example/data/extractor -maxdepth 2 -type f -name '*.kt' -print -exec sed -n '1,260p' {} \;
+          echo '--- GRADLE CATALOG ---'
+          sed -n '1,240p' project/gradle/libs.versions.toml
           python3 tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt
       - name: Enforce ad-free source invariant
         run: |
