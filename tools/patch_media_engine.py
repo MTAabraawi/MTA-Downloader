@@ -391,15 +391,7 @@ def download_model(s):
     COMPLETED,
     FAILED
 }"""
-    s = replace_required(s, old, new, "DownloadStatus paused state")
-    old_field = """    val thumbnailResId: Int? = null,
-    val createdAt: Long = System.currentTimeMillis()
-)"""
-    new_field = """    val thumbnailResId: Int? = null,
-    val createdAt: Long = System.currentTimeMillis(),
-    val requestHeadersJson: String = ""
-)"""
-    return replace_required(s, old_field, new_field, "DownloadEntity request header snapshot")
+    return replace_required(s, old, new, "DownloadStatus paused state")
 edit("app/src/main/java/com/example/data/model/VideoModels.kt", download_model)
 def room_entity_headers(s):
     s = s.replace("import androidx.room.Entity\n", "import androidx.room.ColumnInfo\nimport androidx.room.Entity\n")
