@@ -15,6 +15,14 @@ class BrowserMediaParserTest {
             BrowserMediaKind.AUDIO_FILE,
             BrowserMediaParser.parse("https://cdn.example/audio.m4a")?.kind
         )
+        assertEquals(
+            BrowserMediaKind.AUDIO_FILE,
+            BrowserMediaParser.parse("https://cdn.example/audio.opus")?.kind
+        )
+        assertEquals(
+            BrowserMediaKind.VIDEO_FILE,
+            BrowserMediaParser.parse("https://cdn.example/video.mkv")?.kind
+        )
     }
 
     @Test
