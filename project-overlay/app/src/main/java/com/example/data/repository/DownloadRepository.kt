@@ -298,7 +298,8 @@ class DownloadRepository(
         }
 
         for (entity in active) {
-            if (entity.systemDownloadId !in updatedIds) {
+            // Local yt-dlp jobs use systemDownloadId=0 and are not tracked by Android DownloadManager.
+            if (entity.systemDownloadId > 0L && entity.systemDownloadId !in updatedIds) {
                 downloadDao.update(entity.copy(status = DownloadStatus.FAILED.name))
             }
         }
