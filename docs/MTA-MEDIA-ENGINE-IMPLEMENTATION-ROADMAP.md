@@ -57,6 +57,7 @@ The requested upstream projects are not all drop-in Android libraries.
 
 ## Work status at this checkpoint
 
-- Completed: isolated feature branch, GPL-3.0 project license file, third-party notice inventory, integration plan, and owner approval record.
-- Not completed: runtime dependency integration, NewPipe integration, XDM-inspired downloader implementation, source publication workflow, APK/AAB build and device tests.
-- Blocking input: the Android source is packaged in a ZIP at the repository root. The GitHub file connector can inspect text files but cannot materialize that binary ZIP into the build workspace. The repository's build workflow extracts it, but the exact source tree is not available to this editing session for safe Gradle/Kotlin changes. Do not guess Gradle plugin versions or API calls.
+- Completed: isolated feature branch, GPL-3.0 project license, third-party notice inventory, yt-dlp Android runtime integration, app initialization, shared/page URL routing to the local engine, Room progress updates, MediaStore publication on Android 10+, cancellation interruption, and protection against DownloadManager reconciliation incorrectly failing local jobs.
+- CI: the first integration build, tests, application identity checks, signing verification, and artifact upload passed. The latest changes are being rebuilt; see the PR checks before merging.
+- Not completed: NewPipe provider, XDM-style segmented/resumable queue, persistent pause/resume controls, dependency SBOM and final package-size review, and physical Android 12 testing.
+- Source handling: original ZIP baseline remains unchanged. CI applies reviewed source overlays and a guarded patch to the original MediaExtractorEngine after extraction.
