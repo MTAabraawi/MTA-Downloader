@@ -47,6 +47,12 @@ fun OpenSourceLicensesScreen() {
                 .bufferedReader().use { it.readText() }
         }.getOrElse { "لم يتم تضمين SBOM في هذا البناء؛ يجب استخدام بناء CI الذي يولد قائمة الاعتماديات." }
     }
+    val embeddedPythonPackages = remember {
+        runCatching {
+            context.assets.open("open-source-licenses/EMBEDDED_PYTHON_PACKAGES.json")
+                .bufferedReader().use { it.readText() }
+        }.getOrElse { "لم يتم تضمين بيانات حزم Python في هذا البناء." }
+    }
     var selectedDocument by remember { mutableStateOf<String?>(null) }
     var selectedTitle by remember { mutableStateOf("") }
 
@@ -106,6 +112,12 @@ fun OpenSourceLicensesScreen() {
             selectedDocument = dependencySbom
         }) {
             Text("عرض قائمة الاعتماديات SBOM")
+        }
+        OutlinedButton(onClick = {
+            selectedTitle = "حزم Python المضمنة داخل yt-dlp-android"
+            selectedDocument = embeddedPythonPackages
+        }) {
+            Text("عرض حزم Python المضمنة")
         }
         OutlinedButton(onClick = {
             uriHandler.openUri("https://github.com/MTAabraawi/MTA-Downloader")
