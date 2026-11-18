@@ -43,9 +43,9 @@ jobs:
           test -n "$KEYSTORE_BASE64" || { echo "::error::Missing KEYSTORE_BASE64 repository secret"; exit 1; }
           mkdir -p project
           unzip -q mta-downloader-nov-17-2026-10-15-48-pm.zip -d project
-          # Apply reviewed source overlay without mutating the archived baseline.
           cp -a project-overlay/. project/
           python3 tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt
+          python3 tools/apply_adfree_redesign.py project
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > project/my-upload-key.jks
           chmod 600 project/my-upload-key.jks
           test -s project/my-upload-key.jks
@@ -87,16 +87,13 @@ jobs:
           AAB="project/app/build/outputs/bundle/release/app-release.aab"
           APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
           AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
-
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee apk-signature-verification.txt
           jarsigner -verify -verbose -certs "$AAB" > aab-signature-verification.txt
           keytool -printcert -jarfile "$AAB" > aab-certificate.txt
           keytool -list -v -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASSWORD" -alias upload > keystore-certificate.txt
-
           "$AAPT" dump badging "$APK" | grep -m1 "^package:" | tee app-identity.txt
           grep -q "com.aistudio.mtadownloader.xktmqa" app-identity.txt
           sha256sum "$APK" "$AAB" | tee release-sha256.txt
-
           {
             echo "## Signed release verification"
             echo "- APK signature: verified by apksigner"
