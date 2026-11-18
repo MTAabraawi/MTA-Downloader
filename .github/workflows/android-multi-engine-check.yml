@@ -114,8 +114,7 @@ jobs:
           profile: pixel_2
           disable-animations: true
           script: |
-            cd project
-            gradle --no-daemon --no-configuration-cache connectedDebugAndroidTest
+            cd "$GITHUB_WORKSPACE/project" && gradle --no-daemon --no-configuration-cache connectedDebugAndroidTest
       - name: Audit SBOM, AAR and APK for licenses and FFmpeg
         working-directory: project
         run: |
