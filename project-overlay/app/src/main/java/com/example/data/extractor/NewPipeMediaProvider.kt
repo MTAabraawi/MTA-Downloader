@@ -108,7 +108,7 @@ internal object NewPipeMediaProvider {
                 extractor.audioStreams.forEach { stream ->
                     val mediaUrl = stream.content
                     if (mediaUrl.startsWith("https://", true)) {
-                        val format = stream.format
+                        val format = stream.format ?: return@forEach
                         add(
                             com.example.data.model.QualityOption(
                                 id = "newpipe_audio_${format.suffix}_${stream.averageBitrate}",
