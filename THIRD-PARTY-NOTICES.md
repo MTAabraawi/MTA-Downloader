@@ -6,8 +6,8 @@ This file records upstream projects evaluated for the unified media engine. List
 
 | Project | Upstream | Role considered | License reported by upstream | Integration status |
 |---|---|---|---|---|
-| yt-dlp | https://github.com/yt-dlp/yt-dlp | Site extraction core | Unlicense | Evaluated; not yet integrated |
-| NewPipe Extractor | https://github.com/TeamNewPipe/NewPipeExtractor | Native site extractors | GPL-3.0-or-later | Evaluated; not yet integrated |
+| yt-dlp | https://github.com/yt-dlp/yt-dlp | Site extraction core bundled by Android wrapper | Unlicense (upstream source) | Integrated transitively via yt-dlp-android 2.0.2; bundled component inventory still required |
+| yt-dlp-android | https://github.com/ffmpegkit-maintained/yt-dlp-android | Android runtime wrapper for yt-dlp | MIT | Added in feature branch; CI/build validation pending |\n| NewPipe Extractor | https://github.com/TeamNewPipe/NewPipeExtractor | Native site extractors | GPL-3.0-or-later | Evaluated; not integrated |
 | QuickTube | https://github.com/devgalib/QuickTube | Reference architecture only | GPL-3.0-or-later | Reference only; do not copy app branding/assets |
 | Seal | https://github.com/JunkFood02/Seal | Android yt-dlp integration reference | GPL-3.0 | Reference only; do not use Seal name or branding |
 | XDM | https://github.com/itsolaph/xdm | Download manager architecture reference | Verify exact upstream revision before use | Reference only; not yet integrated |
