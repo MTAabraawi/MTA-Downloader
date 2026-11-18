@@ -1,63 +1,52 @@
-# MTA Downloader — Media Engine Integration Audit
+# MTA Downloader — Ad-free Multi-Engine Roadmap
 
 Date: 2026-11-18
-Base: MTA-Downloader main at 5a25d2d663a8590fd3e6a1f56ee6a9370c637ae1
-Working branch: feature/mta-unified-media-engine
+Working branch: feature/multi-engine-adfree
+Base commit: 429003d2c1d3a8c618f77ed1f160caa483f6a914
 
-## Decision gate: licensing
+## Product requirement
 
-The requested upstream projects are not all drop-in Android libraries.
+MTA Downloader is ad-free. No advertising SDK, advertising identifier, ad initialization, rewarded-ad callback, ad-only screen, or watch-an-ad download gate may remain. After the user selects an available format, the download starts directly. Preserve unrelated app functionality.
 
-| Project | Intended role | Upstream license / integration note |
+## Correct roles of the requested projects
+
+| Project | Role | MTA integration approach |
 |---|---|---|
-| yt-dlp | Broad site extraction | Unlicense upstream; Python-based. Android needs a maintained runtime/wrapper and ABI review. |
-| NewPipe Extractor | Native extractors for supported services | GPL-3.0-or-later. |
-| QuickTube (devgalib/QuickTube) | Reference architecture and integration patterns | GPL-3.0; it integrates NewPipe Extractor and yt-dlp. Do not copy its application code. |
-| Seal | Android reference implementation for yt-dlp | GPL-3.0; use as reference, not as an additional engine. |
-| XDM (itsolaph/xdm) | Reference for segmented/resumable downloads and browser capture | GPL-3.0-or-later; uses NewPipe Extractor. |
+| yt-dlp | Multi-site extractor | Existing on-device Android runtime; broad-coverage provider |
+| NewPipe Extractor | Native extraction library | Independent provider after API, dependency, and GPL review |
+| QuickTube | Android reference application | Study its NewPipe → page parser → yt-dlp fallback design; do not copy the app wholesale |
+| Seal | yt-dlp Android front-end/reference | Use ideas such as playlists, subtitles, metadata and command options; do not use Seal branding or name |
+| XDM | Download manager/reference | Adopt segmented HTTP, retry, pause/resume and queue concepts; it is not an extractor |
 
-**Integrated first-stage Android wrapper (2026-11-18):** `dev.ffmpegkit-maintained:yt-dlp-android:2.0.2` is now added through the source overlay on the feature branch. It embeds CPython 3.13 through Chaquopy and yt-dlp, supports arm64-v8a and x86_64, and the free build does not include TLS fingerprint impersonation. Page URLs now route to the on-device yt-dlp download path after the existing rewarded-ad callback. The build, SBOM, dependency notices, and device behavior are still unverified; do not merge or ship until CI and device validation pass.
+## Target architecture
 
-**Owner approval recorded (2026-11-18):** the owner approved distributing MTA Downloader under GPL-3.0-compatible terms and publishing the corresponding source and notices. This approval permits proceeding with the licensing migration, subject to preserving third-party notices and separately reviewing every bundled component.
+1. Common media extraction provider contract with cancellation and bounded timeouts.
+2. Deterministic router that avoids concurrent duplicate extraction for one URL.
+3. Browser media parser for public direct media URLs observed in the user's own browser session; recognize MP4/WebM/audio, HLS playlists and DASH manifests.
+4. NewPipe provider for supported services using a pinned NewPipe Extractor API.
+5. yt-dlp provider as broad-coverage on-device fallback.
+6. MTA-owned download manager with validated HTTP ranges, bounded parallel segments, ETag/Last-Modified checks, durable checkpoints, pause/resume/retry, queue limits, safe assembly and Android storage publication.
+7. Normalized format model shared by quality selection and download history.
 
-## Proposed MTA architecture
+## Routing and correctness
 
-1. MediaExtractionProvider interface and MediaExtractionRouter with deterministic priority, timeout, cancellation, and normalized errors.
-2. YtDlpProvider as an optional provider behind a reviewed Android runtime adapter; no TLS impersonation or DRM circumvention.
-3. NewPipeProvider as an optional provider only after GPL approval; never run two extractors concurrently for the same URL by default.
-4. BrowserCaptureProvider for public direct media URLs observed in the user's WebView session, retaining safe Referer/User-Agent handling.
-5. An MTA-owned download core inspired by XDM: HTTP range validation, bounded parallel segments, durable checkpoints, ETag/Last-Modified validation, pause/resume/retry, queue limits, storage safety, and correct HLS handling.
-6. Keep the existing Compose UI, Room history, app identity, signing configuration, and Start.io rewarded-ad flow. The ad completion callback remains the gate before a download starts.
+Browser-captured direct media → NewPipe → yt-dlp → explicit unsupported result. Never invent resolutions, sizes, MIME types, or extensions. HLS/DASH manifests and fragments must not be mislabeled as MP4; remux only after a verified local operation. Report unsupported, login-only, region-blocked, expired and protected streams clearly.
 
-## Safety and correctness constraints
+## Licensing and safety
 
-- Only public/direct media the user is authorized to save; do not bypass DRM, private access, paywalls, or account controls.
-- Never label .ts, .m4s, HLS segments, or DASH fragments as MP4 without a verified remux.
-- Report unsupported, login-only, region-blocked, expired, or protected streams clearly.
-- Do not add opaque remote extraction servers or TLS-fingerprint impersonation.
-- Do not replace the production signing key or publish CI-signed artifacts.
+Keep GPL-3.0-or-later and provide corresponding source and notices for shipped components. Verify exact versions and license compatibility before incorporating code from GPL-family references. QuickTube, Seal and XDM are reference applications, not independent extractor binaries to bundle. Do not use Seal branding. No DRM circumvention, private-content access, paywall bypass, account-control bypass, or TLS fingerprint impersonation.
 
-## Validation plan
+## Verification
 
-- Unit tests for URL parsing, provider selection, timeout/cancellation, MIME/format mapping, and range/ETag resume logic.
-- CI: unit tests, lint, debug/release build, dependency/license inventory, APK size and ABI inventory.
-- Device validation on Android 12: shared links, in-app browser capture, Start.io reward completion/cancel, download pause/resume, restart recovery, storage playback.
-- Live extraction tests use only public test media with permission and are informational when a service blocks CI IPs.
+- Static scan: no Start.io/StartApp, AD_ID, ad SDK coordinates, identifiers, reward callbacks or ad gate in source, manifest, Gradle or patch scripts.
+- Tests: URL classification, normalized formats, router order/fallback, timeout/cancellation, HLS/DASH detection, range/ETag resume and no-ad invariant.
+- CI: tests, lint, debug/release builds, dependency inventory, SBOM, APK/AAB size and ABI review.
+- Physical Android 12 tests: shared links, browser capture, immediate download, pause/resume, restart recovery, storage and playback.
+- Preserve production signing key; never distribute CI-signed builds as production updates.
 
+## Status at this commit
 
-## Verified Android integration candidate
-
-- Artifact: `dev.ffmpegkit-maintained:yt-dlp-android:2.0.2` (Maven Central, MIT metadata).
-- Android minimum: API 24; device target Android 12 is compatible by stated minimum.
-- ABIs: arm64-v8a and x86_64; the user's Samsung arm64 device is within the supported set.
-- Runtime: embedded CPython 3.13 / Chaquopy; expected AAR size approximately 60–80 MB before final APK/AAB packaging.
-- Important limitation: free version does not provide TLS fingerprint impersonation. No impersonation or anti-bot bypass feature will be used.
-- yt-dlp's source repository is Unlicense, but bundled executable releases may include components under other licenses; use source/PyPI artifacts and preserve all notices, rather than assuming every binary distribution has identical licensing.
-- NewPipe Extractor latest observed release during this review: v0.27.1. Pin an exact version and commit before adding it; verify dependency graph and GPL notices.
-
-## Work status at this checkpoint
-
-- Completed: isolated feature branch, GPL-3.0 project license, third-party notice inventory, yt-dlp Android runtime integration, app initialization, shared/page URL routing to the local engine, Room progress updates, MediaStore publication on Android 10+, cancellation interruption, and protection against DownloadManager reconciliation incorrectly failing local jobs.
-- CI: the first integration build, tests, application identity checks, signing verification, and artifact upload passed. The latest changes are being rebuilt; see the PR checks before merging.
-- Not completed: NewPipe provider, XDM-style segmented/resumable queue, persistent pause/resume controls, dependency SBOM and final package-size review, and physical Android 12 testing.
-- Source handling: original ZIP baseline remains unchanged. CI applies reviewed source overlays and a guarded patch to the original MediaExtractorEngine after extraction.
+- Existing: yt-dlp Android dependency and initialization in the overlay; baseline ZIP remains unchanged.
+- Corrected: removed Start.io dependency, app-ID metadata, AD_ID permission and SDK initialization from the overlay; renamed the repository download method to remove the rewarded-ad requirement.
+- Not yet complete: audit/remove all ad references from extracted baseline and every patch script; implement and wire BrowserMediaParser, NewPipeProvider, router and resumable download manager; add tests and validate CI.
+- No NewPipe provider, XDM-style segmented manager, physical device test or release artifact is claimed complete until implemented and verified.
