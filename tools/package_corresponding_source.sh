@@ -26,6 +26,7 @@ else
 fi
 printf "NewPipe Extractor v0.27.1 commit: %s\n" "$(git -C "$BUNDLE/upstream/NewPipeExtractor" rev-parse HEAD)" > "$BUNDLE/UPSTREAM-VERSIONS.txt"
 printf "FFmpegKit Full 8.1.9 tag: v8.1.9-lts-android\nFFmpeg source commit: %s\n" "$(git -C "$BUNDLE/upstream/FFmpeg" rev-parse HEAD)" >> "$BUNDLE/UPSTREAM-VERSIONS.txt"
+rm -rf "$BUNDLE/upstream/NewPipeExtractor/.git" "$BUNDLE/upstream/FFmpeg/.git"
 
 cat > "$BUNDLE/BUILDING.md" <<'EOF'
 # MTA Downloader corresponding source package
