@@ -54,6 +54,13 @@ fun OpenSourceLicensesScreen() {
         )
         Card {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("MTA Downloader", style = MaterialTheme.typography.titleMedium)
+                Text("GNU GPL v3-or-later — كود التطبيق ومصادر التعديلات")
+                Text("المصدر: github.com/MTAabraawi/MTA-Downloader")
+            }
+        }
+        Card {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("NewPipe Extractor 0.27.1", style = MaterialTheme.typography.titleMedium)
                 Text("GPL-3.0-or-later — محرك استخراج مدمج")
                 Text("المصدر: github.com/TeamNewPipe/NewPipeExtractor")
