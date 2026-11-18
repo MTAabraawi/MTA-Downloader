@@ -8,6 +8,14 @@ from pathlib import Path
 from email.parser import Parser
 
 def license_names(component):
+    # CycloneDX marks the Gradle root project and inherited TeamNewPipe nanojson fork
+    # as unreported even though their source licenses are known.
+    manual = {
+        "app": ["GPL-3.0-or-later"],
+        "nanojson": ["MIT", "Apache-2.0"],
+    }
+    if component.get("name", "").lower() in manual:
+        return manual[component["name"].lower()]
     found = []
     for item in component.get("licenses", []) or []:
         lic = item.get("license") or item.get("expression") or {}
@@ -42,6 +50,9 @@ def main():
         "open-source-licenses/DEPENDENCY_SBOM.json",
         "open-source-licenses/EMBEDDED_PYTHON_PACKAGES.json",
         "THIRD-PARTY-NOTICES.txt",
+        "open-source-licenses/FFMPEG-LICENSE.txt",
+        "open-source-licenses/FFMPEG-THIRD-PARTY-NOTICES.txt",
+        "open-source-licenses/GPL-3.0.txt",
     ]
     missing_license_assets = [
         asset for asset in required_license_assets
@@ -79,6 +90,24 @@ def main():
     apk_ffmpeg = [name for name in apk_entries if ffmpeg_pattern.search(name)]
     aar_ffmpeg = [name for name in aar_entries if ffmpeg_pattern.search(name)]
     ffmpeg_components = [c for c in components if "ffmpeg" in c.get("name", "").lower() or "ffmpegkit" in c.get("name", "").lower()]
+    ffmpeg_gpl_components = [c for c in ffmpeg_components if "-gpl" in c.get("name", "").lower()]
+    ffmpeg_full = [
+        c for c in ffmpeg_components
+        if c.get("name", "").lower() == "ffmpeg-kit-full" and c.get("version") == "8.1.9"
+    ]
+    ffmpeg_abis = sorted({
+        match.group(1)
+        for entry in apk_ffmpeg
+        if (match := re.search(r"lib/(arm64-v8a|x86_64)/", entry))
+    })
+    if ffmpeg_gpl_components:
+        raise SystemExit("GPL FFmpeg artifact detected; only the LGPL ffmpeg-kit-full variant is approved.")
+    if not ffmpeg_full:
+        raise SystemExit("Expected dev.ffmpegkit-maintained:ffmpeg-kit-full:8.1.9 is missing from the resolved SBOM.")
+    if not any("LGPL" in item.upper() for item in license_names(ffmpeg_full[0])):
+        raise SystemExit("FFmpegKit Full license metadata is missing or is not LGPL.")
+    if not {"arm64-v8a", "x86_64"}.issubset(set(ffmpeg_abis)):
+        raise SystemExit("FFmpeg native libraries are missing one of the expected ABIs: " + ", ".join(ffmpeg_abis))
     manifest_path = args.output.with_name("embedded-python-packages.json")
     previous_manifest = {}
     if manifest_path.is_file():
@@ -106,7 +135,12 @@ def main():
         "",
     ]
     if apk_ffmpeg or aar_ffmpeg or ffmpeg_components:
-        lines.append("**Potential FFmpeg components were detected. Manual license/build-configuration review is required before release.**")
+        lines.append("**FFmpegKit Full 8.1.9 was detected and matched the approved LGPL-only dependency.**")
+        lines.append("- Declared license: " + ", ".join(license_names(ffmpeg_full[0])))
+        lines.append("- Packaged ABIs: " + ", ".join(ffmpeg_abis))
+        lines.append("- FFmpeg native-library entries detected: " + str(len(apk_ffmpeg)))
+        lines.append("- Corresponding source tag: v8.1.9-lts-android (commit 469e560b89a9ba4cab357d2c306c676b0c611745)")
+        lines.append("- GPL-named FFmpeg artifacts: none")
         for item in sorted(set(apk_ffmpeg + aar_ffmpeg)):
             lines.append("- Binary/archive entry: " + item)
         for item in ffmpeg_components:
@@ -166,7 +200,7 @@ def main():
         "- Resolve every NOT_REPORTED license and inspect native libraries embedded inside AARs, not just Gradle module names.",
         "- Extract exact yt-dlp, Certifi, CPython, and Chaquopy versions from the AAR/package metadata and archive their corresponding source/notice materials. The AAR metadata scan above lists Python distributions where wheel metadata is present.",
         "- NewPipe Extractor is GPL-3.0-or-later. Prepare and publish the corresponding source and build/patch scripts for the shipped binary, and verify the complete app distribution obligations before release.",
-        "- Do not claim FFmpeg is shipped unless the final APK/AAR inspection identifies it. If later added, record its exact build flags, enabled codecs/libraries, license mode (LGPL/GPL/nonfree), source revision, modifications, and corresponding source.",
+        "- Verify the FFmpeg AAR native libraries and build configuration against the pinned v8.1.9-lts-android source. The workflow rejects GPL-named variants and requires both published ABIs.",
         "- Keep the generated SBOM and this audit report with each release artifact.",
         "",
     ]
