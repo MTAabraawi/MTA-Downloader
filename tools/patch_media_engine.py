@@ -401,17 +401,16 @@ def download_model(s):
 )"""
     return replace_required(s, old_field, new_field, "DownloadEntity request header snapshot")
 edit("app/src/main/java/com/example/data/model/VideoModels.kt", download_model)
-edit("app/src/main/java/com/example/data/local/DownloadEntity.kt", lambda s: replace_required(
-    s,
-    """    val thumbnailResId: Int? = null,
-    val createdAt: Long = System.currentTimeMillis()
-)""",
-    """    val thumbnailResId: Int? = null,
-    val createdAt: Long = System.currentTimeMillis(),
-    val requestHeadersJson: String = ""
-)""",
-    "Room DownloadEntity requestHeadersJson"
-))
+def room_entity_headers(s):
+    s = s.replace("import androidx.room.Entity\n", "import androidx.room.ColumnInfo\nimport androidx.room.Entity\n")
+    return replace_required(
+        s,
+        '    val requestHeadersJson: String = ""',
+        '    @ColumnInfo(defaultValue = "\'\'") val requestHeadersJson: String = ""',
+        "Room requestHeadersJson SQL default"
+    )
+edit("app/src/main/java/com/example/data/local/DownloadEntity.kt", room_entity_headers)
+
 
 def database_migration(s):
     s = s.replace("import androidx.room.RoomDatabase\n",
