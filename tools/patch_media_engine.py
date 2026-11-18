@@ -394,13 +394,18 @@ def download_model(s):
     return replace_required(s, old, new, "DownloadStatus paused state")
 edit("app/src/main/java/com/example/data/model/VideoModels.kt", download_model)
 def room_entity_headers(s):
-    s = s.replace("import androidx.room.Entity\n", "import androidx.room.ColumnInfo\nimport androidx.room.Entity\n")
-    return replace_required(
-        s,
-        '    val requestHeadersJson: String = ""',
-        '    @ColumnInfo(defaultValue = "\'\'") val requestHeadersJson: String = ""',
-        "Room requestHeadersJson SQL default"
+    s = s.replace(
+        "import androidx.room.Entity\n",
+        "import androidx.room.ColumnInfo\nimport androidx.room.Entity\n"
     )
+    old = """    val thumbnailResId: Int? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)"""
+    new = """    val thumbnailResId: Int? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(defaultValue = "''") val requestHeadersJson: String = ""
+)"""
+    return replace_required(s, old, new, "Room DownloadEntity requestHeadersJson")
 edit("app/src/main/java/com/example/data/local/DownloadEntity.kt", room_entity_headers)
 
 
