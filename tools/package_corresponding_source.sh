@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "\${BASH_SOURCE[0]}")/.." && pwd)"
-OUTPUT="\${1:-\${REPO_ROOT}/MTA-DOWNLOADER-CORRESPONDING-SOURCE.zip}"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+OUTPUT="${1:-${REPO_ROOT}/MTA-DOWNLOADER-CORRESPONDING-SOURCE.zip}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -23,7 +23,7 @@ if [[ -f "$PYTHON_MANIFEST" ]]; then
 else
   echo "WARNING: embedded Python package manifest unavailable; inspect the audit report before release."
 fi
-printf "NewPipe Extractor v0.27.1 commit: %s\\n" "$(git -C "$BUNDLE/upstream/NewPipeExtractor" rev-parse HEAD)" > "$BUNDLE/UPSTREAM-VERSIONS.txt"
+printf "NewPipe Extractor v0.27.1 commit: %s\n" "$(git -C "$BUNDLE/upstream/NewPipeExtractor" rev-parse HEAD)" > "$BUNDLE/UPSTREAM-VERSIONS.txt"
 
 cat > "$BUNDLE/BUILDING.md" <<'EOF'
 # MTA Downloader corresponding source package
@@ -34,7 +34,8 @@ This source package accompanies the GPL-3.0-or-later MTA Downloader build that u
 - The exact original Android project source archive used by the CI validation workflow.
 - The reviewed project overlay containing MTA-owned integration code, tests, license assets, and app changes.
 - The patch and source-application scripts used to reconstruct the validation source tree.
-- The NewPipe Extractor v0.27.1 upstream source checkout.\n- Exact yt-dlp and Certifi source distributions when their versions are available in the AAR metadata manifest.
+- The NewPipe Extractor v0.27.1 upstream source checkout.
+- Exact yt-dlp and Certifi source distributions when their versions are available in the AAR metadata manifest.
 - The MTA project GPL license and third-party notices.
 
 ## Reconstruct and build
