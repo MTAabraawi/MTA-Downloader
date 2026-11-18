@@ -108,15 +108,35 @@ class SegmentedHttpDownloader(
     }
 
 
-    /** Full HTTPS transfer for adaptive tracks that must both be local before muxing. */
+    /** Full HTTPS transfer for adaptive tracks. A validator-backed partial file survives pause/cancel. */
     suspend fun downloadToFile(url: String, destination: File, headers: Map<String, String> = emptyMap(),
         onProgress: (SegmentedDownloadProgress) -> Unit = {}): File = withContext(Dispatchers.IO) {
         require(url.startsWith("https://", true)) { "Only HTTPS downloads are supported" }
         val parent = destination.absoluteFile.parentFile ?: throw IOException("Missing destination directory")
         check(parent.exists() || parent.mkdirs()) { "Could not create download directory" }
         val temporary = File(parent, destination.name + ".download-part")
-        temporary.delete()
+        val metadata = File(parent, destination.name + ".download-meta")
+        var offset = temporary.takeIf { it.isFile }?.length() ?: 0L
+        var validator: String? = null
+        var expectedTotal = -1L
+        if (offset > 0L && metadata.isFile) {
+            runCatching {
+                val saved = Properties().apply { metadata.inputStream().use(::load) }
+                require(saved.getProperty("url") == url)
+                validator = saved.getProperty("validator")?.takeIf { it.isNotBlank() }
+                expectedTotal = saved.getProperty("total")?.toLongOrNull() ?: -1L
+                require(validator != null && expectedTotal > offset)
+            }.onFailure {
+                temporary.delete(); metadata.delete(); offset = 0L; validator = null; expectedTotal = -1L
+            }
+        } else if (offset > 0L) {
+            temporary.delete(); metadata.delete(); offset = 0L
+        }
         val request = Request.Builder().url(url).get().apply {
+            if (offset > 0L && validator != null) {
+                header("Range", "bytes=$offset-")
+                header("If-Range", validator!!)
+            }
             headers.forEach { (name, value) -> header(name, value) }
         }.build()
         val call = client.newCall(request)
@@ -133,9 +153,34 @@ class SegmentedHttpDownloader(
                     "Media URL returned a page or JSON instead of media"
                 }
                 val body = response.body ?: throw IOException("Media response body is empty")
-                val total = body.contentLength()
-                var downloaded = 0L
-                FileOutputStream(temporary).use { output ->
+                val responseValidator = response.header("ETag")?.takeIf { it.isNotBlank() }
+                    ?: response.header("Last-Modified")?.takeIf { it.isNotBlank() }
+                val append = offset > 0L && response.code == 206 && responseValidator == validator
+                if (offset > 0L && response.code == 206) {
+                    val range = parseContentRange(response.header("Content-Range"))
+                    check(append && range != null && range.first == offset) {
+                        "Media server changed the stream while resuming"
+                    }
+                    expectedTotal = range.third
+                } else {
+                    // A server that ignores Range (HTTP 200) is safely restarted from byte zero.
+                    offset = 0L
+                    expectedTotal = body.contentLength()
+                    validator = responseValidator
+                    temporary.delete()
+                }
+                if (validator != null) {
+                    val props = Properties().apply {
+                        setProperty("url", url)
+                        setProperty("validator", validator!!)
+                        setProperty("total", expectedTotal.toString())
+                    }
+                    FileOutputStream(metadata).use { props.store(it, "MTA adaptive stream resume") }
+                } else {
+                    metadata.delete()
+                }
+                var downloaded = offset
+                FileOutputStream(temporary, append).use { output ->
                     body.byteStream().use { input ->
                         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                         while (true) {
@@ -144,19 +189,25 @@ class SegmentedHttpDownloader(
                             if (count < 0) break
                             output.write(buffer, 0, count)
                             downloaded += count
-                            onProgress(SegmentedDownloadProgress(downloaded, total, 0, 1))
+                            onProgress(SegmentedDownloadProgress(downloaded, expectedTotal, 0, 1))
                         }
+                        output.fd.sync()
                     }
                 }
-                check(downloaded > 0L) { "Media stream is empty" }
-                if (total > 0L) check(downloaded == total) { "Media transfer was truncated" }
+                check(downloaded > offset) { "Media stream is empty" }
+                if (expectedTotal > 0L) check(downloaded == expectedTotal) { "Media transfer was truncated" }
             }
             currentCoroutineContext().ensureActive()
-            if (destination.exists()) check(destination.delete()) { "Could not replace previous media file" }
+            if (destination.exists()) check(destination.delete()) { "Could not replace destination" }
             check(temporary.renameTo(destination)) { "Could not finalize media file" }
+            metadata.delete()
             destination
         } catch (error: Throwable) {
-            temporary.delete()
+            // Keep only validator-backed partial bytes; otherwise they cannot be resumed safely.
+            if (validator == null || !temporary.isFile || temporary.length() <= 0L) {
+                temporary.delete()
+                metadata.delete()
+            }
             throw error
         } finally { cancellation?.dispose() }
     }
