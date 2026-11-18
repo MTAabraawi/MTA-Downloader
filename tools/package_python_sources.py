@@ -15,7 +15,8 @@ def main():
         print("WARNING: embedded Python package manifest is missing; source sdists were not downloaded.")
         return 0
 
-    packages = json.loads(args.manifest.read_text(encoding="utf-8"))
+    manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+    packages = manifest.get("python_distributions", []) if isinstance(manifest, dict) else manifest
     wanted = {"yt-dlp", "certifi"}
     found = set()
     args.output.mkdir(parents=True, exist_ok=True)
