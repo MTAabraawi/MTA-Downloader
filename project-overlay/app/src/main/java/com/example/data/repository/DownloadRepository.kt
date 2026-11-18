@@ -255,7 +255,7 @@ class DownloadRepository(
         val output = File(directory, fileName)
         val video = File(directory, fileName + ".video")
         val audio = File(directory, fileName + ".audio")
-        output.delete() // Preserve validator-backed track partials across pause/resume.
+        output.delete(); video.delete(); audio.delete()
         val headersJson = encodeRequestHeaders(quality.requestHeaders, audioUrl, quality.audioRequestHeaders)
         val row = resumeEntity?.copy(
             systemDownloadId = 0L, sourceUrl = videoUrl, sourcePlatform = request.sourcePlatform,
@@ -294,16 +294,11 @@ class DownloadRepository(
         segmentedJobs[id] = job
         val merged = try { job.await() }
         catch (cancelled: CancellationException) {
-            progressScope.cancel()
-            // downloadToFile retains only validator-backed partial tracks and their resume metadata.
-            output.delete()
+            progressScope.cancel(); video.delete(); audio.delete(); output.delete()
             downloadDao.update(tracked.copy(status = DownloadStatus.PAUSED.name))
             return id
         } catch (error: Throwable) {
-            progressScope.cancel()
-            video.delete(); audio.delete(); output.delete()
-            File(directory, video.name + ".download-meta").delete()
-            File(directory, audio.name + ".download-meta").delete()
+            progressScope.cancel(); video.delete(); audio.delete(); output.delete()
             downloadDao.update(tracked.copy(status = DownloadStatus.FAILED.name))
             throw error
         } finally { progressScope.cancel(); segmentedJobs.remove(id, job) }

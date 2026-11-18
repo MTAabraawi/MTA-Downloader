@@ -145,6 +145,10 @@ class SegmentedHttpDownloader(
         }
         try {
             call.execute().use { response ->
+                if (response.code == 416) {
+                    temporary.delete(); metadata.delete()
+                    throw IOException("Media server rejected the resume offset; retry the download")
+                }
                 check(response.isSuccessful) { "Media server returned HTTP ${response.code}" }
                 val finalUrl = response.request.url
                 check(finalUrl.isHttps && isPublicHost(finalUrl.host)) { "Redirect resolved to an insecure or private host" }
@@ -158,8 +162,9 @@ class SegmentedHttpDownloader(
                 val append = offset > 0L && response.code == 206 && responseValidator == validator
                 if (offset > 0L && response.code == 206) {
                     val range = parseContentRange(response.header("Content-Range"))
-                    check(append && range != null && range.first == offset) {
-                        "Media server changed the stream while resuming"
+                    if (!append || range == null || range.first != offset || range.third <= offset) {
+                        temporary.delete(); metadata.delete()
+                        throw IOException("Media server changed the stream while resuming")
                     }
                     expectedTotal = range.third
                 } else {
