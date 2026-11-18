@@ -101,7 +101,7 @@ class DownloadRepository(
         require(host != "localhost" && !host.endsWith(".localhost") && !host.endsWith(".local")) {
             "لا يمكن تنزيل روابط الأجهزة أو الشبكات المحلية"
         }
-        if (host.matches(Regex("""\\d{1,3}(\\.\\d{1,3}){3}"""))) {
+        if (host.matches(Regex("""\d{1,3}(\.\d{1,3}){3}"""))) {
             val octets = host.split(".").map { it.toIntOrNull() ?: 256 }
             require(octets.size == 4 && octets.all { it in 0..255 }) { "عنوان IP غير صالح" }
             val a = octets[0]
