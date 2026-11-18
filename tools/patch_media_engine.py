@@ -530,8 +530,8 @@ def main_viewmodel_pause_resume(s):
     s = replace_required(s, old_mime, new_mime, "retry media kind and route")
     if "requestHeaders = retryHeaders" not in s:
         s, count = re.subn(
-            r"(overrideStreamUrl = entity\\.sourceUrl)(,?\\s*\\n\\s*\\))",
-            r"\\1,\\n            requestHeaders = retryHeaders\\2",
+            r"(overrideStreamUrl = entity\.sourceUrl)(,?\s*\n\s*\))",
+            r"\1,\n            requestHeaders = retryHeaders\2",
             s,
             count=1
         )
