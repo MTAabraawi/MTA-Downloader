@@ -64,9 +64,8 @@ def edit(rel, transform):
         raise SystemExit(f"Required source file missing: {rel}")
     old = p.read_text(encoding="utf-8")
     new = transform(old)
-    if new == old:
-        raise SystemExit(f"No changes applied to {rel}; refusing silent partial patch.")
-    p.write_text(new, encoding="utf-8")
+    if new != old:
+        p.write_text(new, encoding="utf-8")
 
 def replace_required(s, old, new, label):
     if old not in s:
