@@ -619,40 +619,11 @@ def catalog_headers(s):
         "import com.example.R\n",
         "import com.example.R\nimport com.example.data.extractor.BrowserMediaKind\nimport com.example.data.extractor.MediaExtractionRouter\n"
     )
-    old = """    fun buildFromCapturedBrowserStreams(
-        streams: List<DetectedMediaStream>,
-        pageTitle: String,
-        platform: String
-    ): VideoItem {
-        val primary = streams.first()
-        val qualities = streams.mapIndexed { idx, s ->
-            QualityOption(
-                id = "captured_${idx}",
-                label = if (idx == 0) "البث الملتقط الأساسي (${s.formatLabel})" else "بث ملتقط ${idx + 1} (${s.formatLabel})",
-                format = s.formatLabel,
-                sizeEstimate = "مباشر",
-                extension = s.extension,
-                mimeType = s.mimeType,
-                overrideStreamUrl = s.url
-            )
-        }
-        return VideoItem(
-            id = "captured_${System.currentTimeMillis()}",
-            title = pageTitle.ifBlank { primary.title },
-            channelName = platform,
-            channelInitial = platform.firstOrNull()?.uppercase() ?: "M",
-            views = "${streams.size} مسار مكتشف",
-            publishedAgo = "الآن",
-            duration = primary.formatLabel,
-            category = "رائج الآن",
-            sourcePlatform = platform,
-            thumbnailRes = R.drawable.img_hero_banner,
-            streamUrl = primary.url,
-            description = "تم التقاط بث الوسائط مباشرة من المتصفح الذكي.",
-            qualities = qualities
-        )
-    }"""
-    new = """    fun buildFromCapturedBrowserStreams(
+    start = s.find("    fun buildFromCapturedBrowserStreams(")
+    class_end = s.rfind("\n}")
+    if start < 0 or class_end <= start:
+        raise SystemExit("Captured browser stream catalog method not found")
+    method = """    fun buildFromCapturedBrowserStreams(
         streams: List<DetectedMediaStream>,
         pageTitle: String,
         platform: String
@@ -701,8 +672,9 @@ def catalog_headers(s):
             description = "تم التقاط بث الوسائط مباشرة من المتصفح الذكي.",
             qualities = qualities
         )
-    }"""
-    return replace_required(s, old, new, "browser media manifest classification")
+    }
+"""
+    return s[:start] + method + s[class_end:]
 edit("app/src/main/java/com/example/data/repository/VideoCatalogRepository.kt", catalog_headers)
 
 def browser_headers(s):
