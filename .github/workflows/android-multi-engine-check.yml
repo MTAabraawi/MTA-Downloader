@@ -16,6 +16,10 @@ on:
       - 'docs/**'
       - '.github/workflows/android-multi-engine-check.yml'
 
+concurrency:
+  group: mta-multi-engine-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
