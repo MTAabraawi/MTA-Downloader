@@ -593,6 +593,18 @@ class DownloadRepository(
                 }
             }
         }
+        cleanupSegmentedFiles(entity.fileName)
         downloadDao.deleteById(entity.id)
+    }
+
+    private fun cleanupSegmentedFiles(fileName: String) {
+        val root = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return
+        val directory = File(root, "MTA_Downloader")
+        listOf(
+            fileName + ".mta-resume",
+            fileName + ".mta-resume.tmp",
+            fileName + ".mta-assembling"
+        ).forEach { File(directory, it).delete() }
+        directory.listFiles()?.filter { it.name.startsWith(fileName + ".mta-part-") }?.forEach { it.delete() }
     }
 }
