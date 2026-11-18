@@ -682,44 +682,30 @@ def browser_headers(s):
         "onMediaDetected: (String, String?, String?) -> Unit,",
         "onMediaDetected: (String, String?, String?, Map<String, String>) -> Unit,"
     )
-    s = s.replace("onMediaDetected(src, title, mime)", "onMediaDetected(src, title, mime, emptyMap())")
-    s = s.replace("onMediaDetected(url, title, mimetype)", "onMediaDetected(url, title, mimetype, emptyMap())")
-    old = """                                    if (lower.endsWith(".mp4") ||
-                                        lower.endsWith(".m4v") ||
-                                        lower.endsWith(".webm") ||
-                                        lower.endsWith(".mov") ||
-                                        lower.endsWith(".mp3") ||
-                                        lower.endsWith(".m4a") ||
-                                        accept.contains("video/", true)
-                                    ) {
-                                        post { onMediaDetected(reqUrl, view?.title, null) }
-                                    }"""
-    new = """                                    val manifestMime = when {
-                                        accept.contains("mpegurl", true) -> "application/vnd.apple.mpegurl"
-                                        accept.contains("dash+xml", true) -> "application/dash+xml"
-                                        else -> null
-                                    }
-                                    if (lower.endsWith(".mp4") ||
-                                        lower.endsWith(".m4v") ||
-                                        lower.endsWith(".webm") ||
-                                        lower.endsWith(".mov") ||
-                                        lower.endsWith(".mp3") ||
-                                        lower.endsWith(".m4a") ||
-                                        lower.endsWith(".m3u8") ||
-                                        lower.endsWith(".mpd") ||
-                                        manifestMime != null ||
-                                        accept.contains("video/", true)
-                                    ) {
-                                        post {
-                                            onMediaDetected(
-                                                reqUrl,
-                                                view?.title,
-                                                manifestMime,
-                                                request?.requestHeaders.orEmpty()
-                                            )
-                                        }
-                                    }"""
-    return replace_required(s, old, new, "capture HLS/DASH manifests and browser headers")
+    # Keep compatibility with every existing callback call while passing only request headers.
+    s = re.sub(
+        r"onMediaDetected\\(([^,]+),\\s*([^,]+),\\s*null\\)",
+        r"onMediaDetected(\\1, \\2, null, request?.requestHeaders.orEmpty())",
+        s
+    )
+    s = re.sub(
+        r"onMediaDetected\\(([^,]+),\\s*([^,]+),\\s*([A-Za-z_][A-Za-z0-9_]*)\\)",
+        r"onMediaDetected(\\1, \\2, \\3, emptyMap())",
+        s
+    )
+    # Recognize adaptive manifests as media candidates; do not treat TS/M4S segments as files.
+    s = s.replace(
+        'lower.endsWith(".m4a") ||',
+        'lower.endsWith(".m4a") || lower.endsWith(".m3u8") || lower.endsWith(".mpd") ||'
+    )
+    s = s.replace(
+        'accept.contains("video/", true)',
+        '(accept.contains("video/", true) || accept.contains("mpegurl", true) || accept.contains("dash+xml", true))'
+    )
+    if "onMediaDetected: (String, String?, String?, Map<String, String>) -> Unit," not in s:
+        raise SystemExit("BrowserScreen callback signature was not updated.")
+    return s
+
 edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", browser_headers)
 
 def viewmodel_headers(s):
