@@ -52,6 +52,7 @@ jobs:
           mkdir project
           unzip -q mta-downloader-nov-17-2026-10-15-48-pm.zip -d project
           cp -a project-overlay/. project/
+          python3 tools/apply_adfree_redesign.py project
           echo '--- SOURCE INVENTORY ---'
           find project/app/src/main/java/com/example/data -maxdepth 4 -type f | sort | head -120
           echo '--- EXTRACTOR SOURCES ---'
@@ -71,7 +72,7 @@ jobs:
       - name: Enforce ad-free source invariant
         run: |
           set -euo pipefail
-          if grep -RInE 'StartApp|StartIo|Start\.io|210745939|AD_ID|com\.startapp|rewarded.?ad|onVideoCompleted' project/app/src/main project/app/build.gradle.kts; then
+          if grep -RInE 'StartApp|StartIo|Start\.io|210745939|AD_ID|com\.startapp|rewarded.?ad|RewardDownloadConfirmDialog|rewardDialogState|enqueueDownloadAfterReward|onVideoCompleted' project/app/src/main project/app/build.gradle.kts; then
             echo "::error::Advertising SDK, identifier, or rewarded-ad flow remains in the assembled source."
             exit 1
           fi
