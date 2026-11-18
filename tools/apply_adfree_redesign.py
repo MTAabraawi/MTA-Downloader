@@ -117,17 +117,4 @@ if ads_dir.exists():
     import shutil
     shutil.rmtree(ads_dir)
 
-# Fail closed if any advertising SDK, identifier, or rewarded-ad gate survives in app source.
-ad_pattern = re.compile(r"StartApp|StartIo|Start\.io|210745939|AD_ID|com\.startapp|rewarded.?ad|onVideoCompleted", re.I)
-scan_roots = [root / "app/src/main", root / "app/build.gradle.kts"]
-remaining = []
-for base in scan_roots:
-    candidates = [base] if base.is_file() else base.rglob("*")
-    for file in candidates:
-        if file.is_file() and file.suffix in {".kt", ".java", ".xml", ".kts"}:
-            for number, line in enumerate(file.read_text(encoding="utf-8").splitlines(), 1):
-                if ad_pattern.search(line):
-                    remaining.append(f"{file}:{number}:{line.strip()}")
-if remaining:
-    raise SystemExit("Ad-free invariant failed:\n" + "\\n".join(remaining))
-print("Ad-free source transformation and invariant scan passed.")
+print("Ad-free source transformation completed; final invariant is checked after the overlay is applied.")
