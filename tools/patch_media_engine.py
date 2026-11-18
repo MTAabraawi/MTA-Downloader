@@ -359,6 +359,31 @@ def segmented_downloader_testability(s):
     return s
 edit("app/src/main/java/com/example/data/download/SegmentedHttpDownloader.kt", segmented_downloader_testability)
 
+def recover_orphaned_ytdlp_jobs(s):
+    old = """        val interruptedSegments = active.filter {
+            it.systemDownloadId == 0L &&
+                (it.totalBytes > 0L || it.status == DownloadStatus.QUEUED.name) &&
+                segmentedJobs[it.id]?.isActive != true
+        }
+        interruptedSegments.forEach { downloadDao.update(it.copy(status = DownloadStatus.PAUSED.name)) }
+
+        val ids = active.map { it.systemDownloadId }.filter { it > 0L }.toLongArray()
+        if (ids.isEmpty()) return@withContext interruptedSegments.isNotEmpty()"""
+    new = """        val orphanedLocalJobs = active.filter {
+            it.systemDownloadId == 0L && segmentedJobs[it.id]?.isActive != true
+        }
+        // Segmented HTTP jobs retain validated part files and can safely resume after a restart.
+        val interruptedSegments = orphanedLocalJobs.filterNot { it.fileName.endsWith(".pending") }
+        interruptedSegments.forEach { downloadDao.update(it.copy(status = DownloadStatus.PAUSED.name)) }
+        // yt-dlp jobs do not yet have durable checkpoints; mark them failed so users can retry.
+        val interruptedYtDlp = orphanedLocalJobs.filter { it.fileName.endsWith(".pending") }
+        interruptedYtDlp.forEach { downloadDao.update(it.copy(status = DownloadStatus.FAILED.name)) }
+
+        val ids = active.map { it.systemDownloadId }.filter { it > 0L }.toLongArray()
+        if (ids.isEmpty()) return@withContext interruptedSegments.isNotEmpty() || interruptedYtDlp.isNotEmpty()"""
+    return replace_required(s, old, new, "recover interrupted segmented and yt-dlp jobs distinctly")
+edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", recover_orphaned_ytdlp_jobs)
+
 def normalize_download_media_types(s):
     s = s.replace(
         '".mp3", ".m4a", ".aac", ".wav", ".ogg", ".vtt"',
