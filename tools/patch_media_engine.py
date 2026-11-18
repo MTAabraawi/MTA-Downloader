@@ -21,7 +21,7 @@ if "NewPipeMediaProvider.extract(" not in source:
         r"""\1
 
             // Native provider first for supported services; yt-dlp remains the broad fallback.
-            NewPipeMediaProvider.extract(normalizedUrl, customTitle, platform)?.let { extractedItem ->
+            MediaExtractionRouter.extract(normalizedUrl, customTitle, platform)?.let { extractedItem ->
                 return@withContext MediaExtractionResult.Success(extractedItem)
             }""",
         source,
@@ -33,7 +33,7 @@ if "NewPipeMediaProvider.extract(" not in source:
 manifest_anchor = """        // Never mistake a login/error HTML page for a downloadable video just because its URL ends in .mp4.
         if (contentType.startsWith("text/html") || contentType.contains("application/json")) return null"""
 manifest_replacement = """        // HLS/DASH are manifests, not standalone MP4 files; route them to an extractor/remux-capable path.
-        val browserReference = BrowserMediaParser.parse(url, contentType)
+        val browserReference = MediaExtractionRouter.classifyBrowserMedia(url, contentType)
         if (browserReference?.kind == BrowserMediaKind.HLS_MANIFEST ||
             browserReference?.kind == BrowserMediaKind.DASH_MANIFEST) return null
 
