@@ -249,9 +249,9 @@ edit("app/src/test/java/com/example/ExampleRobolectricTest.kt", tests)
 def model(s):
     s = s.replace("val qualities: List<QualityOption> = defaultVideoQualities()",
                   "val qualities: List<QualityOption> = emptyList()")
-    a = s.find("\\nfun defaultVideoQualities(): List<QualityOption> = listOf(")
+    a = s.find("\nfun defaultVideoQualities(): List<QualityOption> = listOf(")
     if a >= 0:
-        s = s[:a].rstrip() + "\\n"
+        s = s[:a].rstrip() + "\n"
     return s
 edit("app/src/main/java/com/example/data/model/VideoModels.kt", model)
 
@@ -278,7 +278,7 @@ def fallback(s):
                             label = "أفضل فيديو متاح",
                             format = "اختيار تلقائي من المحرك",
                             sizeEstimate = "يحدد بعد التحليل",
-                            extension = "مkv",
+                            extension = "mkv",
                             mimeType = "video/*",
                             overrideStreamUrl = normalizedUrl
                         ),
