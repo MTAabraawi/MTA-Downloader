@@ -37,7 +37,7 @@ class DownloadRepository(
 
     val allDownloads: Flow<List<DownloadEntity>> = downloadDao.observeAllDownloads()
 
-    suspend fun enqueueDownloadAfterReward(
+    suspend fun enqueueDownload(
         request: PendingDownloadRequest,
         quality: QualityOption
     ): Result<Long> = withContext(Dispatchers.IO) {
