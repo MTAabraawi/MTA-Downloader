@@ -88,7 +88,7 @@ jobs:
           gradle --no-daemon --no-configuration-cache :app:dependencyInsight --dependency NewPipeExtractor --configuration debugRuntimeClasspath > app/build/reports/newpipe-dependency-insight.txt
           python3 ../tools/inspect_embedded_python.py --gradle-cache "$HOME/.gradle/caches" --output build/reports/embedded-python-packages.json
           mkdir -p app/src/main/assets/open-source-licenses
-          cp build/reports/bom.json app/src/main/assets/open-source-licenses/DEPENDENCY_SBOM.json
+          cp build/reports/cyclonedx/bom.json app/src/main/assets/open-source-licenses/DEPENDENCY_SBOM.json
           cp build/reports/embedded-python-packages.json app/src/main/assets/open-source-licenses/EMBEDDED_PYTHON_PACKAGES.json
       - name: Build debug APK with embedded SBOM
         working-directory: project
@@ -98,7 +98,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 ../tools/audit_sbom.py \
-            --bom build/reports/bom.json \
+            --bom build/reports/cyclonedx/bom.json \
             --apk app/build/outputs/apk/debug/app-debug.apk \
             --gradle-cache "$HOME/.gradle/caches" \
             --output build/reports/THIRD_PARTY_LICENSE_AUDIT.md
@@ -114,10 +114,9 @@ jobs:
           path: |
             project/app/build/outputs/apk/debug/*.apk
             project/app/build/reports/**
-            project/build/reports/bom.json
-            project/build/reports/bom.xml
-            project/app/build/reports/bom.json
-            project/app/build/reports/bom.xml
+            project/build/reports/cyclonedx/**
+            project/build/reports/cyclonedx-direct/**
+            project/app/build/reports/cyclonedx-direct/**
             project/build/reports/THIRD_PARTY_LICENSE_AUDIT.md
             project/build/reports/embedded-python-packages.json
             MTA-DOWNLOADER-CORRESPONDING-SOURCE.zip
