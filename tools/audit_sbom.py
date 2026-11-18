@@ -152,6 +152,8 @@ def main():
     ]
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text("\n".join(lines), encoding="utf-8")
+    manifest = args.output.with_name("embedded-python-packages.json")
+    manifest.write_text(json.dumps(python_packages, indent=2), encoding="utf-8")
     print("Wrote " + str(args.output) + "; components=" + str(len(components)) + ", missing_license_metadata=" + str(len(missing)) + ", ffmpeg_apk=" + str(len(apk_ffmpeg)) + ", ffmpeg_aar=" + str(len(aar_ffmpeg)))
 
 if __name__ == "__main__":
