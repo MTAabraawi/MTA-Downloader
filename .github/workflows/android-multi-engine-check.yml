@@ -109,6 +109,7 @@ jobs:
             project/build/reports/cyclonedx/**
             project/build/reports/cyclonedx-direct/**
             project/build/reports/THIRD_PARTY_LICENSE_AUDIT.md
+            project/build/reports/embedded-python-packages.json
             MTA-DOWNLOADER-CORRESPONDING-SOURCE.zip
             project/app/build/test-results/**
             project/app/src/main/**
