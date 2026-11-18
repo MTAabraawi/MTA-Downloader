@@ -782,7 +782,11 @@ def video_models_headers(s):
     val requestHeaders: Map<String, String> = emptyMap(),
     val detectedAt: Long = System.currentTimeMillis()
 )"""
-    return replace_required(s, old, new, "DetectedMediaStream request headers")
+    if old in s:
+        return replace_required(s, old, new, "DetectedMediaStream request headers")
+    if "requestHeaders: Map<String, String> = emptyMap()" in s:
+        return s
+    raise SystemExit("DetectedMediaStream request headers are missing")
 edit("app/src/main/java/com/example/data/model/VideoModels.kt", video_models_headers)
 
 def catalog_headers(s):
