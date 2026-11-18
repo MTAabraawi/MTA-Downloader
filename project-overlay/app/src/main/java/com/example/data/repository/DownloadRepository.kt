@@ -58,7 +58,8 @@ class DownloadRepository(
         runCatching {
             val targetStreamUrl = quality.overrideStreamUrl?.takeIf { it.isNotBlank() } ?: request.streamUrl
             validateDownloadUrl(targetStreamUrl)
-            if (resumeEntity == null && !isDirectMediaUrl(targetStreamUrl) && !quality.id.startsWith("newpipe_")) {
+            if (resumeEntity == null && !isDirectMediaUrl(targetStreamUrl) &&
+                !quality.id.startsWith("newpipe_") && !quality.id.startsWith("captured_")) {
                 return@runCatching downloadWithYtDlp(request, quality, targetStreamUrl)
             }
 
@@ -167,6 +168,7 @@ class DownloadRepository(
                 return@runCatching entityId
             }
             progressScope.cancel()
+            if (resumeEntity != null) cleanupSegmentedFiles(fileName)
 
             val dmRequest = DownloadManager.Request(Uri.parse(targetStreamUrl)).apply {
                 setTitle(request.title)
@@ -524,7 +526,9 @@ class DownloadRepository(
 
         // A process restart drops in-memory jobs; completed segments remain on disk and can resume.
         val interruptedSegments = active.filter {
-            it.systemDownloadId == 0L && it.totalBytes > 0L && segmentedJobs[it.id]?.isActive != true
+            it.systemDownloadId == 0L &&
+                (it.totalBytes > 0L || it.status == DownloadStatus.QUEUED.name) &&
+                segmentedJobs[it.id]?.isActive != true
         }
         interruptedSegments.forEach { downloadDao.update(it.copy(status = DownloadStatus.PAUSED.name)) }
 
