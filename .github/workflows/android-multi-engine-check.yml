@@ -52,7 +52,6 @@ jobs:
           mkdir project
           unzip -q mta-downloader-nov-17-2026-10-15-48-pm.zip -d project
           cp -a project-overlay/. project/
-          python3 tools/apply_adfree_redesign.py project
           echo '--- SOURCE INVENTORY ---'
           find project/app/src/main/java/com/example/data -maxdepth 4 -type f | sort | head -120
           echo '--- EXTRACTOR SOURCES ---'
@@ -68,6 +67,7 @@ jobs:
           sed -n '1,240p' project/app/src/main/java/com/example/data/local/DownloadEntity.kt
           python3 tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt
           python3 tools/patch_runtime_stack.py project
+          python3 tools/apply_adfree_redesign.py project
           python3 -m unittest discover -s tools -p 'test_*.py' -v
       - name: Enforce ad-free source invariant
         run: |
