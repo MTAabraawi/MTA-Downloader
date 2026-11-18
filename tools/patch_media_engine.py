@@ -345,14 +345,22 @@ edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", ensu
 
 def segmented_downloader_testability(s):
     if "minimumSegmentedSize" not in s:
-        s, count = re.subn(
-            r"(private val parallelism: Int = 4)(\s*\))",
-            r"\1,\n    private val minimumSegmentedSize: Long = 16L * 1024L * 1024L\2",
-            s,
-            count=1
-        )
-        if count != 1:
-            raise SystemExit("Could not add configurable segmented download threshold.")
+        constructor_anchor = "    private val parallelism: Int = 4,"
+        if constructor_anchor in s:
+            s = s.replace(
+                constructor_anchor,
+                constructor_anchor + "\n    private val minimumSegmentedSize: Long = 16L * 1024L * 1024L,",
+                1
+            )
+        else:
+            s, count = re.subn(
+                r"(private val parallelism: Int = 4)(\s*\))",
+                r"\1,\n    private val minimumSegmentedSize: Long = 16L * 1024L * 1024L\2",
+                s,
+                count=1
+            )
+            if count != 1:
+                raise SystemExit("Could not add configurable segmented download threshold.")
     s = s.replace(
         "probe.total <= 16L * 1024L * 1024L",
         "probe.total <= minimumSegmentedSize"
