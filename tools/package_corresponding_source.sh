@@ -40,11 +40,11 @@ This source package accompanies the GPL-3.0-or-later MTA Downloader build that u
 
 ## Reconstruct and build
 1. Install JDK 21, Android SDK platform 36.1, Android build-tools 36.0.0, Python 3, and Gradle 9.3.1.
-2. Extract the original source archive into a directory named project.
-3. Copy the included project-overlay contents into project/.
-4. Run python3 tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt from the package root.
+2. Extract mta-project-inputs/mta-downloader-nov-17-2026-10-15-48-pm.zip into a directory named project.
+3. Copy mta-project-inputs/project-overlay contents into project/.
+4. Run python3 mta-project-inputs/tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt from the package root.
 5. Build from the reconstructed project directory with gradle --no-daemon testDebugUnitTest lint assembleDebug.
-6. For a CycloneDX inventory, run gradle --init-script ../tools/cyclonedx.init.gradle.kts cyclonedxBom from the reconstructed project root.
+6. For a CycloneDX inventory, run gradle --init-script ../mta-project-inputs/tools/cyclonedx.init.gradle.kts cyclonedxBom from the reconstructed project root.
 
 No production signing key or secrets are included. CI debug artifacts are validation-only.
 EOF
