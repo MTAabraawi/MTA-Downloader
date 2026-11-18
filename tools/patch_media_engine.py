@@ -618,14 +618,94 @@ def video_models_headers(s):
 edit("app/src/main/java/com/example/data/model/VideoModels.kt", video_models_headers)
 
 def catalog_headers(s):
-    old = """                mimeType = s.mimeType,
+    s = s.replace(
+        "import com.example.R\n",
+        "import com.example.R\nimport com.example.data.extractor.BrowserMediaKind\nimport com.example.data.extractor.MediaExtractionRouter\n"
+    )
+    old = """    fun buildFromCapturedBrowserStreams(
+        streams: List<DetectedMediaStream>,
+        pageTitle: String,
+        platform: String
+    ): VideoItem {
+        val primary = streams.first()
+        val qualities = streams.mapIndexed { idx, s ->
+            QualityOption(
+                id = "captured_$${idx}",
+                label = if (idx == 0) "البث الملتقط الأساسي ($${s.formatLabel})" else "بث ملتقط $${idx + 1} ($${s.formatLabel})",
+                format = s.formatLabel,
+                sizeEstimate = "مباشر",
+                extension = s.extension,
+                mimeType = s.mimeType,
                 overrideStreamUrl = s.url
-"""
-    new = """                mimeType = s.mimeType,
-                overrideStreamUrl = s.url,
-                requestHeaders = s.requestHeaders
-"""
-    return replace_required(s, old, new, "captured stream quality headers")
+            )
+        }
+        return VideoItem(
+            id = "captured_$${System.currentTimeMillis()}",
+            title = pageTitle.ifBlank { primary.title },
+            channelName = platform,
+            channelInitial = platform.firstOrNull()?.uppercase() ?: "M",
+            views = "$${streams.size} مسار مكتشف",
+            publishedAgo = "الآن",
+            duration = primary.formatLabel,
+            category = "رائج الآن",
+            sourcePlatform = platform,
+            thumbnailRes = R.drawable.img_hero_banner,
+            streamUrl = primary.url,
+            description = "تم التقاط بث الوسائط مباشرة من المتصفح الذكي.",
+            qualities = qualities
+        )
+    }"""
+    new = """    fun buildFromCapturedBrowserStreams(
+        streams: List<DetectedMediaStream>,
+        pageTitle: String,
+        platform: String
+    ): VideoItem {
+        val parsed = streams.mapIndexedNotNull { idx, stream ->
+            val media = MediaExtractionRouter.classifyBrowserMedia(stream.url, stream.mimeType)
+                ?: return@mapIndexedNotNull null
+            val isManifest = media.kind == BrowserMediaKind.HLS_MANIFEST ||
+                media.kind == BrowserMediaKind.DASH_MANIFEST
+            val extension = when (media.kind) {
+                BrowserMediaKind.HLS_MANIFEST -> "m3u8"
+                BrowserMediaKind.DASH_MANIFEST -> "mpd"
+                else -> stream.extension
+            }
+            val label = when (media.kind) {
+                BrowserMediaKind.HLS_MANIFEST -> "بث HLS"
+                BrowserMediaKind.DASH_MANIFEST -> "بث DASH"
+                BrowserMediaKind.AUDIO_FILE -> "صوت مباشر"
+                BrowserMediaKind.VIDEO_FILE -> "فيديو مباشر"
+            }
+            stream to QualityOption(
+                id = if (isManifest) "captured_manifest_" + idx else "captured_" + idx,
+                label = label + " • " + stream.formatLabel,
+                format = label,
+                sizeEstimate = if (isManifest) "بث متكيف" else "مباشر",
+                extension = extension,
+                mimeType = media.mimeType,
+                overrideStreamUrl = media.url,
+                requestHeaders = stream.requestHeaders
+            )
+        }
+        val primary = parsed.firstOrNull()?.first ?: streams.first()
+        val qualities = parsed.map { it.second }
+        return VideoItem(
+            id = "captured_" + System.currentTimeMillis(),
+            title = pageTitle.ifBlank { primary.title },
+            channelName = platform,
+            channelInitial = platform.firstOrNull()?.uppercase() ?: "M",
+            views = qualities.size.toString() + " مسار مكتشف",
+            publishedAgo = "الآن",
+            duration = primary.formatLabel,
+            category = "رائج الآن",
+            sourcePlatform = platform,
+            thumbnailRes = R.drawable.img_hero_banner,
+            streamUrl = parsed.firstOrNull()?.first?.url ?: primary.url,
+            description = "تم التقاط بث الوسائط مباشرة من المتصفح الذكي.",
+            qualities = qualities
+        )
+    }"""
+    return replace_required(s, old, new, "browser media manifest classification")
 edit("app/src/main/java/com/example/data/repository/VideoCatalogRepository.kt", catalog_headers)
 
 def browser_headers(s):
