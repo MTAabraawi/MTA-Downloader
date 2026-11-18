@@ -186,8 +186,16 @@ class DownloadRepository(
         }
     }
 
-    private fun encodeRequestHeaders(headers: Map<String, String>): String =
-        JSONObject(safeRequestHeaders(headers)).toString()
+    private fun encodeRequestHeaders(headers: Map<String, String>): String {
+        val persistent = safeRequestHeaders(headers).mapValues { (name, value) ->
+            if (name.equals("Referer", ignoreCase = true)) {
+                runCatching {
+                    Uri.parse(value).buildUpon().clearQuery().fragment(null).build().toString()
+                }.getOrDefault(value.substringBefore("?").substringBefore("#"))
+            } else value
+        }
+        return JSONObject(persistent).toString()
+    }
 
     fun requestHeadersFor(entity: DownloadEntity): Map<String, String> =
         decodeRequestHeaders(entity.requestHeadersJson)
