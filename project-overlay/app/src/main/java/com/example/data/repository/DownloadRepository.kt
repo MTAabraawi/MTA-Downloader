@@ -47,7 +47,7 @@ class DownloadRepository(
         runCatching {
             val targetStreamUrl = quality.overrideStreamUrl?.takeIf { it.isNotBlank() } ?: request.streamUrl
             validateDownloadUrl(targetStreamUrl)
-            if (!isDirectMediaUrl(targetStreamUrl)) {
+            if (!isDirectMediaUrl(targetStreamUrl) && !quality.id.startsWith("newpipe_")) {
                 return@runCatching downloadWithYtDlp(request, quality, targetStreamUrl)
             }
 
@@ -176,7 +176,7 @@ class DownloadRepository(
 
     private fun isDirectMediaUrl(url: String): Boolean {
         val path = Uri.parse(url).lastPathSegment.orEmpty().lowercase()
-        return listOf(".mp4", ".m4v", ".webm", ".mov", ".mp3", ".m4a", ".aac", ".wav", ".ogg")
+        return listOf(".mp4", ".m4v", ".webm", ".mov", ".mp3", ".m4a", ".aac", ".wav", ".ogg", ".vtt", ".srt", ".ttml", ".srv1", ".srv2", ".srv3")
             .any(path::endsWith)
     }
 
@@ -309,6 +309,9 @@ class DownloadRepository(
             "m4a" -> "audio/mp4"
             "opus" -> "audio/opus"
             "mkv" -> "video/x-matroska"
+            "vtt" -> "text/vtt"
+            "srt" -> "application/x-subrip"
+            "ttml" -> "application/ttml+xml"
             else -> "application/octet-stream"
         }
         val values = ContentValues().apply {
