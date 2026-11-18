@@ -46,16 +46,18 @@ Keep GPL-3.0-or-later and provide corresponding source and notices for shipped c
 
 ## Status at this commit
 
-- **Ad-free invariant:** the CI source scan passes. Start.io/StartApp dependency, app ID metadata, AD_ID permission and initialization are absent from the assembled source; the download flow no longer has a rewarded-ad gate.
-- **NewPipe Extractor v0.27.1:** pinned and integrated as a native provider for supported services, with an OkHttp downloader adapter. Java/Kotlin bytecode targets are aligned to Java 17, as required by this release line.
-- **MediaExtractionRouter:** native provider requests are bounded by a timeout and duplicate URL requests are serialized with a short-lived result cache. Unsupported URLs continue through the existing page parser and yt-dlp fallback.
-- **BrowserMediaParser:** direct video/audio files are classified separately from HLS/DASH manifests. Manifests are not passed to the direct-file downloader as if they were MP4 files.
-- **Subtitles:** NewPipe subtitle streams are exposed as selectable formats; yt-dlp fallback has a subtitle-only option for normal and automatic subtitles in VTT/best format.
-- **Playlists:** yt-dlp is switched to playlist mode when a playlist URL is detected. Output files are enumerated recursively and each completed media item receives its own download-history row.
-- **Large direct downloads:** the segmented downloader uses bounded 8 MiB ranges, up to four parallel segments, strict Content-Range checks, ETag/Last-Modified validation, three retries and a durable checkpoint. It is selected only for large files whose origin supports validated ranges; otherwise Android DownloadManager remains the fallback.
-- **CI verification:** unit tests, lint and assembleDebug all passed in run [44332978517](https://github.com/MTAabraawi/MTA-Downloader/actions/runs/44332978517). This was a CI validation build only, not a release or a device-test package.
-- **Still outstanding:** explicit pause/resume controls and a durable user-visible queue; restoring browser-captured request headers/cookies safely for protected-by-session public streams; broader provider coverage and real service fixture tests; SBOM/transitive license review and open-source notices UI; release build and signing review.
-- **No physical-device testing or user APK testing has been performed.** Per the agreed sequence, do not ask the user to install a version until the complete integration is finished and the final merge is approved.
+- **Ad-free invariant:** the CI source scan passes. Start.io/StartApp dependency, app ID metadata, AD_ID permission and initialization are absent from the assembled source; the download flow starts directly after format selection.
+- **NewPipe Extractor v0.27.1:** pinned and integrated as a native provider for services recognized by NewPipe, using an OkHttp downloader adapter and ordinary TLS behavior. Extracted fields include title, uploader, views, duration, thumbnail, audio/video formats and available subtitle streams.
+- **MediaExtractionRouter:** native extraction requests run on IO with a bounded timeout, per-URL serialization and a short-lived result cache. Unsupported pages continue through the existing HTML parser and on-device yt-dlp fallback.
+- **Browser capture:** direct video/audio files and HLS/DASH manifests are classified separately. Browser request headers are filtered to a small allowlist, credential-bearing headers are excluded, and the safe snapshot is stored in Room with a v1-to-v2 migration for retry/resume.
+- **HLS/DASH and playlists:** captured manifests are routed to yt-dlp rather than treated as MP4 files. Playlist URLs are detected and downloaded with playlist mode; produced files are enumerated recursively and recorded individually. This is implementation-level integration; broad live-site compatibility still requires fixture and device verification.
+- **Subtitles:** NewPipe subtitle streams are exposed as selectable formats. The yt-dlp fallback supports normal and automatic subtitle-only downloads in VTT/best format.
+- **XDM-style direct downloads:** large files use bounded 8 MiB HTTP ranges, up to four parallel segments, Content-Range validation, ETag/Last-Modified checks, three retries and durable checkpoints. Unsupported or small range downloads fall back to Android DownloadManager.
+- **Queue and recovery:** Room-backed download history, bounded concurrent segmented tasks, pause/resume controls and restart recovery for incomplete segmented jobs are implemented. Pause/resume applies to the segmented direct-download path; yt-dlp tasks remain non-pausable through this UI.
+- **CI verification:** run [44338121298](https://github.com/MTAabraawi/MTA-Downloader/actions/runs/44338121298) passed source application, ad-free scan, unit tests, lint and assembleDebug. The CI package is validation-only and has not been installed on a device.
+- **Latest additional hardening:** BrowserMediaParser now rejects private/reserved IPv4 and IPv6 literal hosts, with unit cases for loopback, unique-local, link-local and carrier-grade NAT ranges.
+- **Still outstanding:** real service fixtures for NewPipe and yt-dlp routing; end-to-end HLS/DASH and playlist output tests; broader metadata and format normalization; dependency/SBOM/transitive-license audit and complete GPL source-distribution package; in-app open-source notices; release signing and production build review.
+- **No physical-device testing or user APK testing has been performed.** Per the agreed sequence, do not ask the user to install a version until the integration is complete, final CI passes and the merge is approved.
 
 ## Next implementation order
 
