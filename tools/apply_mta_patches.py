@@ -919,6 +919,12 @@ for line in lines:
     normalized.append(line)
 p.write_text("\n".join(normalized) + "\n")
 
+# Repair a prior patch-generation defect that serialized Kotlin line breaks as literal \\n.
+browser_text = p.read_text()
+if browser_text.count("\n") < 2 and browser_text.count("\\n") > 100:
+    browser_text = browser_text.replace("\\n", "\n")
+p.write_text(browser_text)
+
 p = root / "app/src/main/java/com/example/data/repository/DownloadRepository.kt"
 s = p.read_text()
 duplicate_validation = """            val parsedTarget = Uri.parse(targetStreamUrl)
