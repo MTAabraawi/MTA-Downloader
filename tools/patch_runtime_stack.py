@@ -55,7 +55,7 @@ engine = root / "app/src/main/java/com/example/data/extractor/MediaExtractorEngi
 text = engine.read_text(encoding="utf-8")
 if "import retrofit2.Retrofit" not in text:
     text = text.replace("import okhttp3.Request\n", "import okhttp3.Request\nimport retrofit2.Retrofit\n")
-if "private val pageApi = Retrofit.Builder()" not in text:
+if "private val pageApi: PublicPageApi = Retrofit.Builder()" not in text:
     anchor = """        .build()
 
 
