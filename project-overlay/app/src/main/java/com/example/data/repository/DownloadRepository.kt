@@ -149,8 +149,7 @@ class DownloadRepository(
                 if (now - lastUpdate.get() >= 900L && lastUpdate.getAndSet(now) <= now) {
                     val percent = progress.toInt().coerceIn(0, 99)
                     progressScope.launch {
-                        val current = downloadDao.observeAllDownloads()
-                        // The Room flow is not collected here; update the known row directly.
+                        // Update the existing Room row while the extractor reports progress.
                         downloadDao.update(
                             DownloadEntity(
                                 id = entityId,
@@ -206,7 +205,7 @@ class DownloadRepository(
                 totalBytes = outputFile.length()
             )
         )
-        outputFile.delete()
+        if (publicUri.scheme == "content") outputFile.delete()
         return entityId
     }
 
