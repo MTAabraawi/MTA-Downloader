@@ -23,6 +23,7 @@ This inventory separates runtime components from reference-only projects. Refere
 - The app exposes an "التراخيص" destination in its navigation.
 - The open-source license bundle contains upstream license texts for NewPipe Extractor, yt-dlp, yt-dlp-android, Chaquopy, CPython, and Certifi.
 - The yt-dlp-android AAR contributes THIRD-PARTY-NOTICES.txt to merged app assets; the in-app screen reads and displays it.
+- CI generates a CycloneDX aggregate SBOM before APK assembly, embeds it as open-source-licenses/DEPENDENCY_SBOM.json, and exposes it from the in-app licenses page.
 - The app screen includes a source-repository link and the no-warranty / redistribution notice required for a prominent GPL legal-notice entry point.
 - The root LICENSE, overlay, patch scripts, source archive, and pinned NewPipe source are assembled into the CI corresponding-source package. Do not publish a binary without the matching source offer/package.
 
