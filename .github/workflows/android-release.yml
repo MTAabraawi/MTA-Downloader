@@ -39,10 +39,12 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -euo pipefail
           test -n "$KEYSTORE_BASE64" || { echo "::error::Missing KEYSTORE_BASE64 repository secret"; exit 1; }
           test -n "$STORE_PASSWORD" || { echo "::error::Missing STORE_PASSWORD repository secret"; exit 1; }
+          test -n "$KEY_PASSWORD" || { echo "::error::Missing KEY_PASSWORD repository secret"; exit 1; }
           mkdir -p project
           unzip -q mta-downloader-nov-17-2026-10-15-48-pm.zip -d project
           cp -a project-overlay/. project/
@@ -61,10 +63,13 @@ jobs:
           import re
           import sys
           encoded = re.sub(r"\s+", "", os.environ["KEYSTORE_BASE64"])
+          # Accept both standard and URL-safe Base64, including omitted trailing padding.
+          encoded = encoded.replace("-", "+").replace("_", "/")
+          encoded += "=" * (-len(encoded) % 4)
           try:
               decoded = base64.b64decode(encoded, validate=True)
           except Exception:
-              print("::error::KEYSTORE_BASE64 is malformed or truncated. Re-copy the original JKS Base64 as one uninterrupted value; do not add quotes.")
+              print("::error::KEYSTORE_BASE64 is malformed or truncated. Re-encode the original JKS file as Base64 and replace only this secret; do not paste the key or passwords into logs or chat.")
               sys.exit(1)
           if not decoded:
               print("::error::Decoded keystore is empty.")
@@ -76,6 +81,9 @@ jobs:
           test -s project/my-upload-key.jks
           # Confirm the decoded file is a readable keystore and contains the expected upload alias.
           keytool -list -keystore project/my-upload-key.jks -storepass "$STORE_PASSWORD" -alias upload >/dev/null
+          # Verify the private-key password too, before spending time on Gradle/emulator builds.
+          keytool -certreq -keystore project/my-upload-key.jks -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" -alias upload -file "$RUNNER_TEMP/mta-upload-key-check.csr" >/dev/null
+          rm -f "$RUNNER_TEMP/mta-upload-key-check.csr"
           echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/project/my-upload-key.jks" >> "$GITHUB_ENV"
       - name: Upload extracted source snapshot for code review
         uses: actions/upload-artifact@v4
