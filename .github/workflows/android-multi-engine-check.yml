@@ -49,6 +49,9 @@ jobs:
           find project/app/src/main/java/com/example -maxdepth 7 -type f | sort | grep -Ei 'download|viewmodel|screen' | head -200 || true
           echo '--- DOWNLOAD FLOW REFERENCES ---'
           grep -RInE 'enqueueDownload|deleteDownload|syncActiveDownloadsProgress|pauseDownload|resumeDownload' project/app/src/main/java/com/example | head -240 || true
+          echo '--- VIDEO AND DOWNLOAD MODELS ---'
+          sed -n '1,260p' project/app/src/main/java/com/example/data/model/VideoModels.kt
+          sed -n '1,240p' project/app/src/main/java/com/example/data/local/DownloadEntity.kt
           python3 tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt
       - name: Enforce ad-free source invariant
         run: |
