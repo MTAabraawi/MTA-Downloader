@@ -14,6 +14,36 @@ import java.nio.file.Files
 
 class SegmentedHttpDownloaderIntegrationTest {
     @Test
+    fun fallsBackWhenOriginIgnoresRangeRequests() = runBlocking {
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request()
+                Response.Builder()
+                    .request(request)
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(200)
+                    .message("OK")
+                    .body("not range-capable".toResponseBody("text/plain".toMediaType()))
+                    .build()
+            }
+            .build()
+        val directory = Files.createTempDirectory("mta-range-fallback").toFile()
+        try {
+            val result = SegmentedHttpDownloader(
+                client = client,
+                segmentSize = 8L,
+                minimumSegmentedSize = 1L
+            ).downloadIfResumable(
+                "https://media.example/no-ranges.bin",
+                File(directory, "fallback.bin")
+            )
+            assertEquals(null, result)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun downloadsAndAssemblesValidatedByteRanges() = runBlocking {
         val payload = ByteArray(37) { index -> (index * 7).toByte() }
         val client = OkHttpClient.Builder()
