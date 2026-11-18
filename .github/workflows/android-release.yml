@@ -45,6 +45,7 @@ jobs:
           unzip -q mta-downloader-nov-17-2026-10-15-48-pm.zip -d project
           # Apply reviewed source overlay without mutating the archived baseline.
           cp -a project-overlay/. project/
+          python3 tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > project/my-upload-key.jks
           chmod 600 project/my-upload-key.jks
           test -s project/my-upload-key.jks
