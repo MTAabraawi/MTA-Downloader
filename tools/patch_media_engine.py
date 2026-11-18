@@ -1191,6 +1191,35 @@ def license_navigation(s):
     return replace_required(s, route_anchor, route_insert, "open-source licenses destination")
 edit("app/src/main/java/com/example/MainActivity.kt", license_navigation)
 
+
+def use_ytdlp_output_collector(s):
+    if "YtDlpOutputCollector" not in s:
+        s = s.replace(
+            "import com.example.data.download.YtDlpCommandPlanner",
+            "import com.example.data.download.YtDlpCommandPlanner\nimport com.example.data.download.YtDlpOutputCollector",
+            1
+        )
+    old = """        val mediaExtensions = setOf(
+            "mp4", "m4v", "webm", "mov", "mkv", "mp3", "m4a", "aac", "wav", "ogg", "opus", "flv", "mkv", "ts", "vtt", "srt", "ttml", "srv1", "srv2", "srv3"
+        )
+        val outputFiles = outputDir.walkTopDown()
+            .filter {
+                it.isFile && it.length() > 0L &&
+                    it.lastModified() >= startedAt - 2_000L &&
+                    it.extension.lowercase() in mediaExtensions
+            }
+            .sortedBy { it.lastModified() }
+            .toList()"""
+    new = """        // Count every non-empty, recent media result, including nested playlist captions.
+        val outputFiles = YtDlpOutputCollector.collectRecentMediaFiles(outputDir, startedAt)"""
+    s = replace_required(s, old, new, "shared yt-dlp output collector")
+    old_title = """            val itemTitle = if (isPlaylist) {
+                outputFile.nameWithoutExtension.substringAfter(" - ", outputFile.nameWithoutExtension)
+            } else request.title"""
+    new_title = """            val itemTitle = YtDlpOutputCollector.displayTitle(outputFile, isPlaylist, request.title)"""
+    return replace_required(s, old_title, new_title, "playlist item title normalization")
+edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", use_ytdlp_output_collector)
+
 # Verify the Android source no longer contains ad SDK IDs, permissions, callbacks, or libraries.
 scan_roots = [root / "app/src/main", root / "app/build.gradle.kts"]
 patterns = re.compile(r"StartApp|StartIo|Start\.io|210745939|AD_ID|onVideoCompleted|com\.startapp|rewarded.?ad", re.I)
