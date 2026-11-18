@@ -635,50 +635,103 @@ def browser_headers(s):
     )
     s = s.replace("onMediaDetected(src, title, mime)", "onMediaDetected(src, title, mime, emptyMap())")
     s = s.replace("onMediaDetected(url, title, mimetype)", "onMediaDetected(url, title, mimetype, emptyMap())")
-    s = s.replace(
-        "post { onMediaDetected(reqUrl, view?.title, null) }",
-        "post { onMediaDetected(reqUrl, view?.title, null, request?.requestHeaders.orEmpty()) }"
-    )
-    return s
+    old = """                                    if (lower.endsWith(".mp4") ||
+                                        lower.endsWith(".m4v") ||
+                                        lower.endsWith(".webm") ||
+                                        lower.endsWith(".mov") ||
+                                        lower.endsWith(".mp3") ||
+                                        lower.endsWith(".m4a") ||
+                                        accept.contains("video/", true)
+                                    ) {
+                                        post { onMediaDetected(reqUrl, view?.title, null, request?.requestHeaders.orEmpty()) }
+                                    }"""
+    new = """                                    val manifestMime = when {
+                                        accept.contains("mpegurl", true) -> "application/vnd.apple.mpegurl"
+                                        accept.contains("dash+xml", true) -> "application/dash+xml"
+                                        else -> null
+                                    }
+                                    if (lower.endsWith(".mp4") ||
+                                        lower.endsWith(".m4v") ||
+                                        lower.endsWith(".webm") ||
+                                        lower.endsWith(".mov") ||
+                                        lower.endsWith(".mp3") ||
+                                        lower.endsWith(".m4a") ||
+                                        lower.endsWith(".m3u8") ||
+                                        lower.endsWith(".mpd") ||
+                                        manifestMime != null ||
+                                        accept.contains("video/", true)
+                                    ) {
+                                        post {
+                                            onMediaDetected(
+                                                reqUrl,
+                                                view?.title,
+                                                manifestMime,
+                                                request?.requestHeaders.orEmpty()
+                                            )
+                                        }
+                                    }"""
+    return replace_required(s, old, new, "capture HLS/DASH manifests and browser headers")
 edit("app/src/main/java/com/example/ui/screens/BrowserScreen.kt", browser_headers)
 
 def viewmodel_headers(s):
     s = s.replace(
-        "fun onMediaStreamDetected(mediaUrl: String, title: String?, mimeHint: String? = null) {",
+        "fun onMediaStreamDetected(mediaUrl: String, title: String?, mimeHint: String? = null, requestHeaders: Map<String, String> = emptyMap()) {",
         "fun onMediaStreamDetected(mediaUrl: String, title: String?, mimeHint: String? = null, requestHeaders: Map<String, String> = emptyMap()) {"
     )
+    s = s.replace(
+        "        if (lower.endsWith(".ts") || lower.endsWith(".m4s") || lower.endsWith(".m3u8") || lower.endsWith(".mpd")) return",
+        "        if (lower.endsWith(".ts") || lower.endsWith(".m4s")) return"
+    )
+    old_ext = """        val ext = when {
+            lower.endsWith(".mp3") || mimeHint?.contains("audio/mpeg", true) == true -> "mp3"
+            lower.endsWith(".m4a") || mimeHint?.contains("audio/mp4", true) == true -> "m4a"
+            lower.endsWith(".webm") || mimeHint?.contains("video/webm", true) == true -> "webm"
+            lower.endsWith(".mov") || mimeHint?.contains("quicktime", true) == true -> "mov"
+            else -> "mp4"
+        }
+        val formatLabel = ext.uppercase(Locale.US)
+        val mime = when {
+            isAudio && ext == "m4a" -> "audio/mp4"
+            isAudio -> "audio/mpeg"
+            ext == "mov" -> "video/quicktime"
+            else -> "video/$ext"
+        }"""
+    new_ext = """        val ext = when {
+            lower.endsWith(".m3u8") || mimeHint?.contains("mpegurl", true) == true -> "m3u8"
+            lower.endsWith(".mpd") || mimeHint?.contains("dash+xml", true) == true -> "mpd"
+            lower.endsWith(".mp3") || mimeHint?.contains("audio/mpeg", true) == true -> "mp3"
+            lower.endsWith(".m4a") || mimeHint?.contains("audio/mp4", true) == true -> "m4a"
+            lower.endsWith(".webm") || mimeHint?.contains("video/webm", true) == true -> "webm"
+            lower.endsWith(".mov") || mimeHint?.contains("quicktime", true) == true -> "mov"
+            else -> "mp4"
+        }
+        val formatLabel = when (ext) {
+            "m3u8" -> "HLS"
+            "mpd" -> "DASH"
+            else -> ext.uppercase(Locale.US)
+        }
+        val mime = when {
+            ext == "m3u8" -> "application/vnd.apple.mpegurl"
+            ext == "mpd" -> "application/dash+xml"
+            isAudio && ext == "m4a" -> "audio/mp4"
+            isAudio -> "audio/mpeg"
+            ext == "mov" -> "video/quicktime"
+            else -> "video/$ext"
+        }"""
+    s = replace_required(s, old_ext, new_ext, "browser HLS/DASH media metadata")
     anchor = """        val mime = when {
+            ext == "m3u8" -> "application/vnd.apple.mpegurl"
+            ext == "mpd" -> "application/dash+xml"
             isAudio && ext == "m4a" -> "audio/mp4"
             isAudio -> "audio/mpeg"
             ext == "mov" -> "video/quicktime"
             else -> "video/$ext"
         }
 
-        _browserState.update { state ->"""
-    replacement = """        val mime = when {
-            isAudio && ext == "m4a" -> "audio/mp4"
-            isAudio -> "audio/mpeg"
-            ext == "mov" -> "video/quicktime"
-            else -> "video/$ext"
-        }
-        // Do not retain Cookie, Authorization, or other credential-bearing headers.
-        val allowedHeaders = setOf("referer", "origin", "user-agent", "accept", "accept-language")
-        val safeHeaders = requestHeaders.entries.mapNotNull { (name, value) ->
-            val normalized = name.lowercase(Locale.US)
-            if (normalized in allowedHeaders && value.length <= 2048 &&
-                !value.contains('\r') && !value.contains('\n')) name to value else null
-        }.toMap()
-
-        _browserState.update { state ->"""
-    s = replace_required(s, anchor, replacement, "browser safe header filtering")
-    old = """                    extension = ext,
-                    mimeType = mime
-"""
-    new = """                    extension = ext,
-                    mimeType = mime,
-                    requestHeaders = safeHeaders
-"""
-    return replace_required(s, old, new, "detected stream safe headers")
+        // Do not retain Cookie"""
+    if anchor not in s:
+        raise SystemExit("Browser MIME block for header filtering was not found.")
+    return s
 edit("app/src/main/java/com/example/ui/MainViewModel.kt", viewmodel_headers)
 
 # Verify the Android source no longer contains ad SDK IDs, permissions, callbacks, or libraries.
