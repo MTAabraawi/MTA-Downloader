@@ -43,6 +43,29 @@ if "BrowserMediaParser.parse(url, contentType)" not in source:
         raise SystemExit("Could not wire BrowserMediaParser into direct-media probing.")
     source = source.replace(manifest_anchor, manifest_replacement, 1)
 
+
+# Expand direct-file recognition without confusing adaptive manifests with standalone files.
+source = source.replace(
+    'val hasDirectExt = lower.endsWith(".mp4") || lower.endsWith(".webm") ||\n            lower.endsWith(".mov") || lower.endsWith(".m4v") ||\n            lower.endsWith(".mp3") || lower.endsWith(".m4a")',
+    'val hasDirectExt = listOf(".mp4", ".m4v", ".webm", ".mov", ".mkv", ".flv", ".mp3", ".m4a", ".aac", ".wav", ".ogg", ".opus").any(lower::endsWith)'
+)
+source = source.replace(
+    'val isAudio = contentType.startsWith("audio/") || lower.endsWith(".mp3") || lower.endsWith(".m4a")',
+    'val isAudio = contentType.startsWith("audio/") || listOf(".mp3", ".m4a", ".aac", ".wav", ".ogg", ".opus").any(lower::endsWith)'
+)
+source = source.replace(
+    'lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov") || lower.endsWith(".m4v")',
+    'lower.endsWith(".mp4") || lower.endsWith(".webm") || lower.endsWith(".mov") || lower.endsWith(".m4v") || lower.endsWith(".mkv") || lower.endsWith(".flv")'
+)
+source = source.replace(
+    'lower.endsWith(".m4v") -> "m4v"\n            else -> "mp4"',
+    'lower.endsWith(".m4v") -> "m4v"\n            lower.endsWith(".mkv") -> "mkv"\n            lower.endsWith(".flv") -> "flv"\n            lower.endsWith(".aac") -> "aac"\n            lower.endsWith(".wav") -> "wav"\n            lower.endsWith(".ogg") -> "ogg"\n            lower.endsWith(".opus") -> "opus"\n            else -> "mp4"'
+)
+source = source.replace(
+    'isAudio && ext == "m4a" -> "audio/mp4"\n            isAudio -> "audio/mpeg"',
+    'isAudio && ext == "m4a" -> "audio/mp4"\n            ext == "aac" -> "audio/aac"\n            ext == "wav" -> "audio/wav"\n            ext == "ogg" -> "audio/ogg"\n            ext == "opus" -> "audio/opus"\n            isAudio -> "audio/mpeg"'
+)
+
 target.write_text(source, encoding="utf-8")
 
 # NewPipe Extractor is published through JitPack. Add it only to dependency-resolution repositories.
