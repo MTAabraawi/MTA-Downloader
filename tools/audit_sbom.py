@@ -40,6 +40,7 @@ def main():
     required_license_assets = [
         "open-source-licenses/OPEN_SOURCE_LICENSES.txt",
         "open-source-licenses/DEPENDENCY_SBOM.json",
+        "open-source-licenses/EMBEDDED_PYTHON_PACKAGES.json",
         "THIRD-PARTY-NOTICES.txt",
     ]
     missing_license_assets = [
@@ -153,7 +154,12 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text("\n".join(lines), encoding="utf-8")
     manifest = args.output.with_name("embedded-python-packages.json")
-    manifest.write_text(json.dumps(python_packages, indent=2), encoding="utf-8")
+    manifest.write_text(json.dumps({
+        "wrapper": "dev.ffmpegkit-maintained:yt-dlp-android:2.0.2",
+        "aar_files_inspected": [str(path) for path in aar_candidates],
+        "python_distributions": python_packages,
+        "metadata_found": bool(python_packages),
+    }, indent=2), encoding="utf-8")
     print("Wrote " + str(args.output) + "; components=" + str(len(components)) + ", missing_license_metadata=" + str(len(missing)) + ", ffmpeg_apk=" + str(len(apk_ffmpeg)) + ", ffmpeg_aar=" + str(len(aar_ffmpeg)))
 
 if __name__ == "__main__":
