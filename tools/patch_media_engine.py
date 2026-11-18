@@ -349,6 +349,15 @@ def fallback(s):
                             extension = "m4a",
                             mimeType = "audio/mp4",
                             overrideStreamUrl = normalizedUrl
+                        ),
+                        QualityOption(
+                            id = "subtitles",
+                            label = "تنزيل الترجمات المتاحة",
+                            format = "ترجمات VTT/SRT",
+                            sizeEstimate = "يحدد بعد التحليل",
+                            extension = "vtt",
+                            mimeType = "text/vtt",
+                            overrideStreamUrl = normalizedUrl
                         )
                     )"""
     if old not in s:
