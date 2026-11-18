@@ -67,6 +67,16 @@ def configure_jitpack():
 
 configure_jitpack()
 
+# Avoid unstable Gradle configuration-cache serialization in the archived Android project.
+gradle_properties = root / "gradle.properties"
+if gradle_properties.exists():
+    gradle_text = gradle_properties.read_text(encoding="utf-8")
+    if "org.gradle.configuration-cache=" not in gradle_text:
+        gradle_properties.write_text(
+            gradle_text.rstrip() + "\\norg.gradle.configuration-cache=false\\n",
+            encoding="utf-8"
+        )
+
 anchor = """            MediaExtractionResult.NeedsSmartBrowser(
                 normalizedUrl = normalizedUrl,
                 platform = platform,
