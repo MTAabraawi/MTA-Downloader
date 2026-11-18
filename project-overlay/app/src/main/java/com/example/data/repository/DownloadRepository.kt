@@ -198,7 +198,14 @@ class DownloadRepository(
         val safeTitle = request.title
             .replace(Regex("[^a-zA-Z0-9\\u0600-\\u06FF._ -]"), "_")
             .trim().take(60).ifBlank { "mta_video" }
-        val outputTemplate = File(outputDir, "${safeTitle}_%(id)s.%(ext)s").absolutePath
+        val isPlaylist = Uri.parse(pageUrl).getQueryParameter("list")?.isNotBlank() == true ||
+            Uri.parse(pageUrl).path.orEmpty().contains("/playlist", ignoreCase = true) ||
+            Uri.parse(pageUrl).path.orEmpty().contains("/showcase/", ignoreCase = true)
+        val outputTemplate = if (isPlaylist) {
+            File(outputDir, safeTitle + "/%(playlist_index)03d - %(title).80s [%(id)s].%(ext)s").absolutePath
+        } else {
+            File(outputDir, safeTitle + "_%(id)s.%(ext)s").absolutePath
+        }
         val formatSelector = when {
             quality.id.contains("1080") -> "best[height<=1080]/best"
             quality.id.contains("720") -> "best[height<=720]/best"
@@ -225,7 +232,7 @@ class DownloadRepository(
         )
         val ytdlpRequest = YtDlpRequest(pageUrl)
             .setOutputTemplate(outputTemplate)
-            .addOption("--no-playlist")
+            .addOption(if (isPlaylist) "--yes-playlist" else "--no-playlist")
             .addOption("--no-warnings")
             .addOption("--newline")
             .addOption("-f", formatSelector)
@@ -276,25 +283,61 @@ class DownloadRepository(
             progressScope.cancel()
         }
 
-        val outputFile = outputDir.listFiles()
-            ?.filter { it.isFile && it.length() > 0L && it.lastModified() >= startedAt - 2_000L }
-            ?.maxByOrNull { it.lastModified() }
-            ?: error("انتهى محرك التنزيل دون العثور على ملف ناتج")
-        val publicUri = publishToDownloads(outputFile, request.title)
-        val completed = downloadDao.getActiveDownloads().firstOrNull { it.id == entityId }
-            ?: error("تعذر العثور على سجل التنزيل")
-        downloadDao.update(
-            completed.copy(
-                format = outputFile.extension.uppercase(),
-                fileName = outputFile.name,
-                localUri = publicUri.toString(),
-                status = DownloadStatus.COMPLETED.name,
-                progress = 100,
-                downloadedBytes = outputFile.length(),
-                totalBytes = outputFile.length()
-            )
+        val mediaExtensions = setOf(
+            "mp4", "m4v", "webm", "mov", "mkv", "mp3", "m4a", "aac", "wav", "ogg", "opus", "flv", "ts"
         )
-        if (publicUri.scheme == "content") outputFile.delete()
+        val outputFiles = outputDir.walkTopDown()
+            .filter {
+                it.isFile && it.length() > 0L &&
+                    it.lastModified() >= startedAt - 2_000L &&
+                    it.extension.lowercase() in mediaExtensions
+            }
+            .sortedBy { it.lastModified() }
+            .toList()
+        check(outputFiles.isNotEmpty()) { "انتهى محرك التنزيل دون العثور على ملفات وسائط ناتجة" }
+
+        outputFiles.forEachIndexed { index, outputFile ->
+            val itemTitle = if (isPlaylist) {
+                outputFile.nameWithoutExtension.substringAfter(" - ", outputFile.nameWithoutExtension)
+            } else request.title
+            val publicUri = publishToDownloads(outputFile, itemTitle)
+            if (index == 0) {
+                val completed = downloadDao.getActiveDownloads().firstOrNull { it.id == entityId }
+                    ?: error("تعذر العثور على سجل التنزيل")
+                downloadDao.update(
+                    completed.copy(
+                        title = itemTitle,
+                        format = outputFile.extension.uppercase(),
+                        fileName = outputFile.name,
+                        localUri = publicUri.toString(),
+                        status = DownloadStatus.COMPLETED.name,
+                        progress = 100,
+                        downloadedBytes = outputFile.length(),
+                        totalBytes = outputFile.length()
+                    )
+                )
+            } else {
+                downloadDao.insert(
+                    DownloadEntity(
+                        systemDownloadId = 0L,
+                        title = itemTitle,
+                        sourceUrl = pageUrl,
+                        sourcePlatform = request.sourcePlatform,
+                        qualityLabel = quality.label,
+                        format = outputFile.extension.uppercase(),
+                        fileName = outputFile.name,
+                        status = DownloadStatus.COMPLETED.name,
+                        progress = 100,
+                        thumbnailUrl = request.thumbnailUrl,
+                        thumbnailResId = request.thumbnailRes,
+                        localUri = publicUri.toString(),
+                        downloadedBytes = outputFile.length(),
+                        totalBytes = outputFile.length()
+                    )
+                )
+            }
+            if (publicUri.scheme == "content") outputFile.delete()
+        }
         return entityId
     }
 
