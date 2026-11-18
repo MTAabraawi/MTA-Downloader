@@ -41,6 +41,8 @@ jobs:
           test -n "$KEYSTORE_BASE64" || { echo "::error::Missing KEYSTORE_BASE64 repository secret"; exit 1; }
           mkdir -p project
           unzip -q mta-downloader-nov-17-2026-10-15-48-pm.zip -d project
+          # Apply reviewed source overlay without mutating the archived baseline.
+          cp -a project-overlay/. project/
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > project/my-upload-key.jks
           chmod 600 project/my-upload-key.jks
           test -s project/my-upload-key.jks
