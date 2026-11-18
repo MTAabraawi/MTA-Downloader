@@ -82,7 +82,7 @@ class DownloadRepository(
             val progressScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             val lastProgressAt = AtomicLong(0L)
             val segmentedFile = try {
-                segmentedDownloader.downloadIfResumable(targetStreamUrl, segmentedTarget) { progress ->
+                segmentedDownloader.downloadIfResumable(targetStreamUrl, segmentedTarget, headers = safeRequestHeaders(quality.requestHeaders)) { progress ->
                     val now = System.currentTimeMillis()
                     if (now - lastProgressAt.get() >= 800L && lastProgressAt.getAndSet(now) <= now) {
                         progressScope.launch {
@@ -130,6 +130,7 @@ class DownloadRepository(
                 setAllowedOverMetered(true)
                 setAllowedOverRoaming(true)
                 setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                safeRequestHeaders(quality.requestHeaders).forEach { (name, value) -> addRequestHeader(name, value) }
                 setDestinationInExternalPublicDir(
                     Environment.DIRECTORY_DOWNLOADS,
                     "MTA_Downloader/" + fileName
@@ -144,6 +145,16 @@ class DownloadRepository(
                 )
             )
             entityId
+        }
+    }
+
+    private fun safeRequestHeaders(headers: Map<String, String>): Map<String, String> {
+        val allowed = setOf("referer", "origin", "user-agent", "accept", "accept-language")
+        return headers.filter { (name, value) ->
+            name.lowercase(Locale.US) in allowed &&
+                value.length <= 2048 &&
+                !value.contains('\\r') &&
+                !value.contains('\\n')
         }
     }
 
@@ -244,6 +255,9 @@ class DownloadRepository(
                 .addOption("--write-auto-subs")
                 .addOption("--sub-langs", "all")
                 .addOption("--sub-format", "vtt/best")
+        }
+        safeRequestHeaders(quality.requestHeaders).forEach { (name, value) ->
+            ytdlpRequest.addOption("--add-header", name + ": " + value)
         }
         val progressScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val lastUpdate = AtomicLong(0L)
