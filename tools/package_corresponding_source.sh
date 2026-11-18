@@ -7,7 +7,7 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 BUNDLE="$WORK/MTA-DOWNLOADER-CORRESPONDING-SOURCE"
-mkdir -p "$BUNDLE/mta-project-inputs" "$BUNDLE/upstream/NewPipeExtractor"
+mkdir -p "$BUNDLE/mta-project-inputs" "$BUNDLE/upstream/NewPipeExtractor" "$BUNDLE/upstream/FFmpeg"
 
 cp "$REPO_ROOT/mta-downloader-nov-17-2026-10-15-48-pm.zip" "$BUNDLE/mta-project-inputs/"
 cp -a "$REPO_ROOT/project-overlay" "$BUNDLE/mta-project-inputs/"
@@ -17,6 +17,7 @@ cp "$REPO_ROOT/LICENSE" "$BUNDLE/"
 cp "$REPO_ROOT/THIRD-PARTY-NOTICES.md" "$BUNDLE/"
 
 git clone --depth 1 --branch v0.27.1 https://github.com/TeamNewPipe/NewPipeExtractor.git "$BUNDLE/upstream/NewPipeExtractor"
+git clone --depth 1 --branch v8.1.9-lts-android https://github.com/ffmpegkit-maintained/ffmpeg.git "$BUNDLE/upstream/FFmpeg"
 PYTHON_MANIFEST="$REPO_ROOT/project/build/reports/embedded-python-packages.json"
 if [[ -f "$PYTHON_MANIFEST" ]]; then
   python3 "$REPO_ROOT/tools/package_python_sources.py" --manifest "$PYTHON_MANIFEST" --output "$BUNDLE/upstream/python-sources"
@@ -24,6 +25,7 @@ else
   echo "WARNING: embedded Python package manifest unavailable; inspect the audit report before release."
 fi
 printf "NewPipe Extractor v0.27.1 commit: %s\n" "$(git -C "$BUNDLE/upstream/NewPipeExtractor" rev-parse HEAD)" > "$BUNDLE/UPSTREAM-VERSIONS.txt"
+printf "FFmpegKit Full 8.1.9 tag: v8.1.9-lts-android\nFFmpeg source commit: %s\n" "$(git -C "$BUNDLE/upstream/FFmpeg" rev-parse HEAD)" >> "$BUNDLE/UPSTREAM-VERSIONS.txt"
 
 cat > "$BUNDLE/BUILDING.md" <<'EOF'
 # MTA Downloader corresponding source package
@@ -34,7 +36,7 @@ This source package accompanies the GPL-3.0-or-later MTA Downloader build that u
 - The exact original Android project source archive used by the CI validation workflow.
 - The reviewed project overlay containing MTA-owned integration code, tests, license assets, and app changes.
 - The patch and source-application scripts used to reconstruct the validation source tree.
-- The NewPipe Extractor v0.27.1 upstream source checkout.
+- The NewPipe Extractor v0.27.1 upstream source checkout.\n- The FFmpegKit Full 8.1.9 upstream source checkout pinned to v8.1.9-lts-android (LGPL-3.0, non-GPL artifact).
 - Exact yt-dlp and Certifi source distributions when their versions are available in the AAR metadata manifest.
 - The MTA project GPL license and third-party notices.
 
