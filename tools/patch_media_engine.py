@@ -18,7 +18,7 @@ native_anchor = re.compile(
 )
 if "NewPipeMediaProvider.extract(" not in source:
     source, count = native_anchor.subn(
-        r"""\\1
+        r"""\1
 
             // Native provider first for supported services; yt-dlp remains the broad fallback.
             NewPipeMediaProvider.extract(normalizedUrl, customTitle, platform)?.let { extractedItem ->
