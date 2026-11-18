@@ -8,14 +8,14 @@ This inventory distinguishes runtime dependencies from architectural references.
 |---|---|---|---|---|
 | yt-dlp | https://github.com/yt-dlp/yt-dlp | Site extraction core | Unlicense (inspect bundled components separately) | Used through Android wrapper |
 | yt-dlp-android | https://github.com/ffmpegkit-maintained/yt-dlp-android | Android runtime wrapper | MIT | Declared; build verification pending |
-| NewPipe Extractor v0.27.1 | https://github.com/TeamNewPipe/NewPipeExtractor | Native site extractors for YouTube, SoundCloud, media.ccc.de, PeerTube and Bandcamp | GPL-3.0-or-later | Added as pinned dependency and wired as the first native page provider; CI verification pending |
+| NewPipe Extractor v0.27.1 | https://github.com/TeamNewPipe/NewPipeExtractor | Native site extractors for YouTube, SoundCloud, media.ccc.de, PeerTube and Bandcamp | GPL-3.0-or-later | Pinned and wired as native provider; unit tests, lint and debug dex/build passed in CI |
 | QuickTube | https://github.com/devgalib/QuickTube | Reference extraction architecture | GPL-3.0 | Reference only |
 | Seal | https://github.com/JunkFood02/Seal | yt-dlp Android workflow reference | GPL-3.0 | Reference only; do not use Seal branding |
 | Android XDM reference | https://github.com/itsolaph/xdm | Segmented/resumable download manager reference | Verify exact revision before copying code | Reference only |
 
 ## Requirements before shipping
 
-- Pin every shipped dependency to an exact version and commit where applicable.
+- Pin every shipped dependency to an exact version and commit where applicable. NewPipe v0.27.1 requires Java 17 source/target compatibility.
 - Preserve upstream copyright notices and full applicable license texts.
 - Record modifications and provide corresponding source/build scripts for shipped binaries.
 - Provide source access alongside each distributed APK/AAB as required by GPLv3 section 6.
