@@ -630,8 +630,8 @@ def catalog_headers(s):
         val primary = streams.first()
         val qualities = streams.mapIndexed { idx, s ->
             QualityOption(
-                id = "captured_$${idx}",
-                label = if (idx == 0) "البث الملتقط الأساسي ($${s.formatLabel})" else "بث ملتقط $${idx + 1} ($${s.formatLabel})",
+                id = "captured_${idx}",
+                label = if (idx == 0) "البث الملتقط الأساسي (${s.formatLabel})" else "بث ملتقط ${idx + 1} (${s.formatLabel})",
                 format = s.formatLabel,
                 sizeEstimate = "مباشر",
                 extension = s.extension,
@@ -640,11 +640,11 @@ def catalog_headers(s):
             )
         }
         return VideoItem(
-            id = "captured_$${System.currentTimeMillis()}",
+            id = "captured_${System.currentTimeMillis()}",
             title = pageTitle.ifBlank { primary.title },
             channelName = platform,
             channelInitial = platform.firstOrNull()?.uppercase() ?: "M",
-            views = "$${streams.size} مسار مكتشف",
+            views = "${streams.size} مسار مكتشف",
             publishedAgo = "الآن",
             duration = primary.formatLabel,
             category = "رائج الآن",
