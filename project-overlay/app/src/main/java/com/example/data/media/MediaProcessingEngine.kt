@@ -67,7 +67,7 @@ class MediaProcessingEngine(context: Context) {
         val file = File.createTempFile(prefix, ".media", appContext.cacheDir)
         val input = appContext.contentResolver.openInputStream(uri)
             ?: throw IllegalArgumentException("تعذر فتح ملف الوسائط المحدد")
-        input.use { source -> file.outputStream().use(source::copyTo) }
+        input.use { source -> file.outputStream().use { output -> source.copyTo(output) } }
         check(file.length() > 0L) { "ملف الوسائط فارغ" }
         return file
     }
