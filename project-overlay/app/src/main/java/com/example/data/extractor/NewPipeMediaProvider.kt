@@ -148,6 +148,7 @@ internal object NewPipeMediaProvider {
             val title = customTitle?.takeIf { it.isNotBlank() } ?: extractor.name
             val uploader = extractor.uploaderName.takeIf { it.isNotBlank() } ?: service.serviceInfo.name
             val firstStream = formats.firstOrNull { !it.id.startsWith("newpipe_subtitle_") }?.overrideStreamUrl ?: return null
+            val thumbnailUrl = runCatching { extractor.thumbnails.firstOrNull()?.url }.getOrNull()
             com.example.data.model.VideoItem(
                 id = "newpipe_${url.hashCode()}",
                 title = title,
@@ -159,6 +160,7 @@ internal object NewPipeMediaProvider {
                 category = "محتوى مستخرج",
                 sourcePlatform = service.serviceInfo.name.ifBlank { fallbackPlatform },
                 thumbnailRes = com.example.R.drawable.img_hero_banner,
+                thumbnailUrl = thumbnailUrl,
                 streamUrl = firstStream,
                 description = "تم استخراج البيانات والصيغ بواسطة NewPipe Extractor. قد تنتهي صلاحية روابط الوسائط المؤقتة.",
                 qualities = formats
