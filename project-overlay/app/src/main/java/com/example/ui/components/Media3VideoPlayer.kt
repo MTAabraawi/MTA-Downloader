@@ -24,24 +24,24 @@ fun Media3VideoPlayer(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val player = remember(context, mediaUrl) {
+    val exoPlayer = remember(context, mediaUrl) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(mediaUrl))
             prepare()
             playWhenReady = true
         }
     }
-    var resumeAfterForeground by remember(player) { mutableStateOf(false) }
+    var resumeAfterForeground by remember(exoPlayer) { mutableStateOf(false) }
 
-    DisposableEffect(player, lifecycleOwner) {
+    DisposableEffect(exoPlayer, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_STOP -> {
-                    resumeAfterForeground = player.playWhenReady
-                    player.pause()
+                    resumeAfterForeground = exoPlayer.playWhenReady
+                    exoPlayer.pause()
                 }
                 Lifecycle.Event.ON_START -> {
-                    if (resumeAfterForeground) player.play()
+                    if (resumeAfterForeground) exoPlayer.play()
                     resumeAfterForeground = false
                 }
                 else -> Unit
@@ -50,7 +50,7 @@ fun Media3VideoPlayer(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            player.release()
+            exoPlayer.release()
         }
     }
 
@@ -59,10 +59,10 @@ fun Media3VideoPlayer(
             PlayerView(viewContext).apply {
                 useController = true
                 controllerAutoShow = true
-                player = player
+                player = exoPlayer
             }
         },
-        update = { it.player = player },
+        update = { it.player = exoPlayer },
         modifier = modifier.fillMaxSize()
     )
 }
