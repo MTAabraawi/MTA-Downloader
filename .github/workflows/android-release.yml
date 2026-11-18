@@ -57,6 +57,7 @@ jobs:
           name: MTA-Downloader-extracted-source-review
           path: |
             project/app/src/main/**
+            project/app/src/test/**
             project/app/build.gradle.kts
             project/gradle/libs.versions.toml
           if-no-files-found: error
