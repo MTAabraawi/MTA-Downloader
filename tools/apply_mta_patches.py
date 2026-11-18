@@ -917,7 +917,7 @@ for line in lines:
             continue
         seen_imports.add(line)
     normalized.append(line)
-p.write_text("\\n".join(normalized) + "\\n")
+p.write_text("\n".join(normalized) + "\n")
 
 p = root / "app/src/main/java/com/example/data/repository/DownloadRepository.kt"
 s = p.read_text()
