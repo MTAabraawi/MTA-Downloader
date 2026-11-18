@@ -52,6 +52,9 @@ class SegmentedHttpDownloaderIntegrationTest {
                 val range = request.header("Range") ?: "bytes=0-${payload.lastIndex}"
                 val match = Regex("bytes=(\\d+)-(\\d+)").matchEntire(range)
                     ?: error("Unexpected range: $range")
+                if (range != "bytes=0-0") {
+                    assertEquals("Wed, 21 Oct 2015 07:28:00 GMT", request.header("If-Range"))
+                }
                 val start = match.groupValues[1].toInt()
                 val end = match.groupValues[2].toInt()
                 val bytes = payload.copyOfRange(start, end + 1)
@@ -61,7 +64,8 @@ class SegmentedHttpDownloaderIntegrationTest {
                     .code(206)
                     .message("Partial Content")
                     .header("Content-Range", "bytes $start-$end/${payload.size}")
-                    .header("ETag", "\"mta-test-v1\"")
+                    .header("ETag", "W/\"mta-weak-etag\"")
+                    .header("Last-Modified", "Wed, 21 Oct 2015 07:28:00 GMT")
                     .body(bytes.toResponseBody("application/octet-stream".toMediaType()))
                     .build()
             }
