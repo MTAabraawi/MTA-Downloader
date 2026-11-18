@@ -53,6 +53,24 @@ fun OpenSourceLicensesScreen() {
                 .bufferedReader().use { it.readText() }
         }.getOrElse { "لم يتم تضمين بيانات حزم Python في هذا البناء." }
     }
+    val ffmpegLicense = remember {
+        runCatching {
+            context.assets.open("open-source-licenses/FFMPEG-LICENSE.txt")
+                .bufferedReader().use { it.readText() }
+        }.getOrElse { "لم يتم تضمين نص LGPL الخاص بـ FFmpeg." }
+    }
+    val ffmpegNotices = remember {
+        runCatching {
+            context.assets.open("open-source-licenses/FFMPEG-THIRD-PARTY-NOTICES.txt")
+                .bufferedReader().use { it.readText() }
+        }.getOrElse { "لم يتم تضمين إشعارات FFmpeg." }
+    }
+    val gplLicense = remember {
+        runCatching {
+            context.assets.open("open-source-licenses/GPL-3.0.txt")
+                .bufferedReader().use { it.readText() }
+        }.getOrElse { "لم يتم تضمين نص GPLv3." }
+    }
     var selectedDocument by remember { mutableStateOf<String?>(null) }
     var selectedTitle by remember { mutableStateOf("") }
 
@@ -107,6 +125,25 @@ fun OpenSourceLicensesScreen() {
         }) {
             Text("عرض إشعارات المكونات المضمنة")
         }
+        Card {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("FFmpegKit Full 8.1.9", style = MaterialTheme.typography.titleMedium)
+                Text("GNU LGPL v3.0 — معالجة ودمج الوسائط محلياً. لم يتم استخدام نسخة GPL codec.")
+                Text("المصدر: github.com/ffmpegkit-maintained/ffmpeg")
+            }
+        }
+        OutlinedButton(onClick = {
+            selectedTitle = "ترخيص FFmpeg — LGPLv3"
+            selectedDocument = ffmpegLicense
+        }) { Text("عرض ترخيص FFmpeg LGPLv3") }
+        OutlinedButton(onClick = {
+            selectedTitle = "إشعارات FFmpeg والمكونات التابعة"
+            selectedDocument = ffmpegNotices
+        }) { Text("عرض إشعارات FFmpeg") }
+        OutlinedButton(onClick = {
+            selectedTitle = "GNU GPLv3 المشار إليه في LGPL"
+            selectedDocument = gplLicense
+        }) { Text("عرض نص GPLv3") }
         OutlinedButton(onClick = {
             selectedTitle = "قائمة مكونات البرنامج — CycloneDX SBOM"
             selectedDocument = dependencySbom
