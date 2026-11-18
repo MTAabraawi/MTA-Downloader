@@ -16,7 +16,7 @@ The requested upstream projects are not all drop-in Android libraries.
 | Seal | Android reference implementation for yt-dlp | GPL-3.0; use as reference, not as an additional engine. |
 | XDM (itsolaph/xdm) | Reference for segmented/resumable downloads and browser capture | GPL-3.0-or-later; uses NewPipe Extractor. |
 
-The Android wrapper commonly used with yt-dlp (yausername/youtubedl-android) is also GPL-3.0 and bundles Python/native components. A different MIT-licensed wrapper exists, but its published architecture bundles a 60–80 MB Python runtime and has a materially larger ABI footprint; it needs independent security, provenance, and license review before use.
+**Updated Android wrapper evaluation (2026-11-18):** `ffmpegkit-maintained/yt-dlp-android` v2.0.2 is published on Maven Central under MIT. Its AAR embeds CPython 3.13 through Chaquopy and yt-dlp, is approximately 60–80 MB, supports arm64-v8a and x86_64, and does not include TLS fingerprint impersonation. It is a candidate adapter, not yet integrated. Its full transitive SBOM, bundled notices, Python package provenance, and APK/AAB size impact must be checked in CI before adoption. Do not enable or add any impersonation feature.
 
 **Owner approval recorded (2026-11-18):** the owner approved distributing MTA Downloader under GPL-3.0-compatible terms and publishing the corresponding source and notices. This approval permits proceeding with the licensing migration, subject to preserving third-party notices and separately reviewing every bundled component.
 
@@ -43,3 +43,20 @@ The Android wrapper commonly used with yt-dlp (yausername/youtubedl-android) is 
 - CI: unit tests, lint, debug/release build, dependency/license inventory, APK size and ABI inventory.
 - Device validation on Android 12: shared links, in-app browser capture, Start.io reward completion/cancel, download pause/resume, restart recovery, storage playback.
 - Live extraction tests use only public test media with permission and are informational when a service blocks CI IPs.
+
+
+## Verified Android integration candidate
+
+- Artifact: `dev.ffmpegkit-maintained:yt-dlp-android:2.0.2` (Maven Central, MIT metadata).
+- Android minimum: API 24; device target Android 12 is compatible by stated minimum.
+- ABIs: arm64-v8a and x86_64; the user's Samsung arm64 device is within the supported set.
+- Runtime: embedded CPython 3.13 / Chaquopy; expected AAR size approximately 60–80 MB before final APK/AAB packaging.
+- Important limitation: free version does not provide TLS fingerprint impersonation. No impersonation or anti-bot bypass feature will be used.
+- yt-dlp's source repository is Unlicense, but bundled executable releases may include components under other licenses; use source/PyPI artifacts and preserve all notices, rather than assuming every binary distribution has identical licensing.
+- NewPipe Extractor latest observed release during this review: v0.27.1. Pin an exact version and commit before adding it; verify dependency graph and GPL notices.
+
+## Work status at this checkpoint
+
+- Completed: isolated feature branch, GPL-3.0 project license file, third-party notice inventory, integration plan, and owner approval record.
+- Not completed: runtime dependency integration, NewPipe integration, XDM-inspired downloader implementation, source publication workflow, APK/AAB build and device tests.
+- Blocking input: the Android source is packaged in a ZIP at the repository root. The GitHub file connector can inspect text files but cannot materialize that binary ZIP into the build workspace. The repository's build workflow extracts it, but the exact source tree is not available to this editing session for safe Gradle/Kotlin changes. Do not guess Gradle plugin versions or API calls.
