@@ -694,3 +694,201 @@ s = s.replace('''            val targetStreamUrl = quality.overrideStreamUrl?.ta
 ''')
 p.write_text(s)
 
+
+
+# Reliability hardening pass: DownloadManager consistency, safe retries, and focused regression tests.
+# This block is idempotent and runs after the browser/extractor patches above.
+
+# 1) Keep the local download database consistent with the Android system download queue.
+p = root / "app/src/main/java/com/example/data/repository/DownloadRepository.kt"
+s = p.read_text()
+s = s.replace(
+    """            require(targetStreamUrl.startsWith("https://", true) || targetStreamUrl.startsWith("http://", true)) {
+                "رابط التنزيل غير صالح"
+            }
+""",
+    """            val parsedTarget = Uri.parse(targetStreamUrl)
+            require(
+                (parsedTarget.scheme.equals("https", true) || parsedTarget.scheme.equals("http", true)) &&
+                    !parsedTarget.host.isNullOrBlank()
+            ) { "رابط التنزيل غير صالح" }
+"""
+)
+s = s.replace(
+    'val fileName = "${sanitizedName}_${safeQualityId}.$safeExtension"',
+    'val fileName = "${sanitizedName}_${safeQualityId}_${System.currentTimeMillis()}.$safeExtension"'
+)
+s = s.replace(
+    """                    if (name.isNotBlank() && value.isNotBlank() && name.length <= 128 && value.length <= 2048) {
+                        addRequestHeader(name, value)
+                    }
+""",
+    """                    val validName = name.matches(Regex("[A-Za-z0-9-]{1,128}"))
+                    val safeValue = value.length <= 2048 && !value.contains('\\r') && !value.contains('\\n')
+                    if (validName && value.isNotBlank() && safeValue) addRequestHeader(name, value)
+"""
+)
+old_enqueue = """            val systemId = downloadManager.enqueue(dmRequest)
+            val entity = DownloadEntity(
+                systemDownloadId = systemId,
+                title = request.title,
+                sourceUrl = targetStreamUrl,
+                sourcePlatform = request.sourcePlatform,
+                qualityLabel = quality.label,
+                format = quality.format,
+                fileName = fileName,
+                status = DownloadStatus.DOWNLOADING.name,
+                progress = 0,
+                thumbnailUrl = request.thumbnailUrl,
+                thumbnailResId = request.thumbnailRes
+            )
+            downloadDao.insert(entity)
+"""
+new_enqueue = """            val systemId = downloadManager.enqueue(dmRequest)
+            try {
+                val entity = DownloadEntity(
+                    systemDownloadId = systemId,
+                    title = request.title,
+                    sourceUrl = targetStreamUrl,
+                    sourcePlatform = request.sourcePlatform,
+                    qualityLabel = quality.label,
+                    format = quality.format,
+                    fileName = fileName,
+                    status = DownloadStatus.QUEUED.name,
+                    progress = 0,
+                    thumbnailUrl = request.thumbnailUrl,
+                    thumbnailResId = request.thumbnailRes
+                )
+                downloadDao.insert(entity)
+                systemId
+            } catch (error: Throwable) {
+                // Do not leave an untracked system download if the Room insert fails.
+                runCatching { downloadManager.remove(systemId) }
+                throw error
+            }
+"""
+if new_enqueue not in s:
+    if old_enqueue not in s:
+        raise SystemExit("Patch anchor missing: DownloadManager/Room enqueue consistency")
+    s = s.replace(old_enqueue, new_enqueue, 1)
+s = s.replace(
+    """        val cursor = downloadManager.query(query)
+        val updatedIds = mutableSetOf<Long>()
+
+        cursor?.use { c ->
+""",
+    """        val cursor = downloadManager.query(query) ?: return@withContext false
+        val updatedIds = mutableSetOf<Long>()
+
+        cursor.use { c ->
+"""
+)
+s = s.replace(
+    """                    DownloadManager.STATUS_PENDING -> DownloadStatus.QUEUED
+                    else -> DownloadStatus.DOWNLOADING
+""",
+    """                    DownloadManager.STATUS_PENDING, DownloadManager.STATUS_PAUSED -> DownloadStatus.QUEUED
+                    else -> DownloadStatus.DOWNLOADING
+"""
+)
+p.write_text(s)
+
+# 2) Retry with the original URL and actual file format rather than fabricated 1080p MP4 defaults.
+p = root / "app/src/main/java/com/example/ui/MainViewModel.kt"
+s = p.read_text()
+old_retry = """        val request = PendingDownloadRequest(
+            title = entity.title,
+            streamUrl = entity.sourceUrl,
+            sourcePlatform = entity.sourcePlatform,
+            thumbnailUrl = entity.thumbnailUrl,
+            thumbnailRes = entity.thumbnailResId,
+            qualities = defaultVideoQualities()
+        )
+"""
+new_retry = """        val extension = entity.fileName.substringAfterLast('.', "mp4")
+            .lowercase(Locale.US)
+            .filter { it.isLetterOrDigit() }
+            .ifBlank { "mp4" }
+        val mimeType = when (extension) {
+            "mp3" -> "audio/mpeg"
+            "m4a" -> "audio/mp4"
+            "webm" -> "video/webm"
+            "mov" -> "video/quicktime"
+            "m4v" -> "video/x-m4v"
+            else -> "video/mp4"
+        }
+        val originalQuality = QualityOption(
+            id = "retry_original",
+            label = entity.qualityLabel,
+            format = entity.format,
+            sizeEstimate = "إعادة المحاولة",
+            extension = extension,
+            mimeType = mimeType,
+            overrideStreamUrl = entity.sourceUrl
+        )
+        val request = PendingDownloadRequest(
+            title = entity.title,
+            streamUrl = entity.sourceUrl,
+            sourcePlatform = entity.sourcePlatform,
+            thumbnailUrl = entity.thumbnailUrl,
+            thumbnailRes = entity.thumbnailResId,
+            qualities = listOf(originalQuality)
+        )
+"""
+if new_retry not in s:
+    if old_retry not in s:
+        raise SystemExit("Patch anchor missing: retry original media format")
+    s = s.replace(old_retry, new_retry, 1)
+p.write_text(s)
+
+# 3) Add focused regression tests for URL parsing, platform boundaries, and retry format mapping.
+test = root / "app/src/test/java/com/example/ExampleUnitTest.kt"
+test.write_text('''package com.example
+
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import com.example.data.extractor.MediaExtractorEngine
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
+class ExampleUnitTest {
+    private fun extractor(): MediaExtractorEngine =
+        MediaExtractorEngine(ApplicationProvider.getApplicationContext<Context>())
+
+    @Test fun extractsSharedUrlAndStripsArabicSentencePunctuation() {
+        assertEquals(
+            "https://www.tiktok.com/@mta/video/123456",
+            extractor().extractFirstUrlFromSharedText("شاهد: https://www.tiktok.com/@mta/video/123456، الآن")
+        )
+    }
+
+    @Test fun acceptsBareWwwDomainAndNormalizesScheme() {
+        assertEquals("https://www.example.com/video", extractor().extractFirstUrlFromSharedText("www.example.com/video"))
+    }
+
+    @Test fun rejectsNonHttpSchemesAndMalformedHostlessUrls() {
+        assertNull(extractor().extractFirstUrlFromSharedText("javascript:alert(1)"))
+        assertNull(extractor().extractFirstUrlFromSharedText("https:///missing-host"))
+    }
+
+    @Test fun platformMatchingUsesHostnameBoundaries() {
+        assertEquals("YouTube", extractor().detectPlatformName("https://m.youtube.com/watch?v=abc"))
+        assertEquals("الويب", extractor().detectPlatformName("https://notyoutube.com/watch?v=abc"))
+        assertEquals("Facebook", extractor().detectPlatformName("https://fb.watch/abc"))
+    }
+
+    @Test fun detectsSupportedPlatformSubdomains() {
+        assertEquals("TikTok", extractor().detectPlatformName("https://www.tiktok.com/@user/video/123"))
+        assertEquals("Instagram", extractor().detectPlatformName("https://m.instagram.com/reel/123"))
+        assertEquals("X / Twitter", extractor().detectPlatformName("https://mobile.twitter.com/user/status/123"))
+    }
+}
+''')
+
+print("Applied DownloadManager reliability hardening and regression tests.")
