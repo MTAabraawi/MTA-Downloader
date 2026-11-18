@@ -528,15 +528,16 @@ def main_viewmodel_pause_resume(s):
         val originalQuality = QualityOption(
             id = retryId,"""
     s = replace_required(s, old_mime, new_mime, "retry media kind and route")
-    old_headers = """            mimeType = mimeType,
-            overrideStreamUrl = entity.sourceUrl,
-            requestHeaders = downloadRepository.requestHeadersFor(entity)
-        )"""
-    new_headers = """            mimeType = mimeType,
-            overrideStreamUrl = entity.sourceUrl,
-            requestHeaders = retryHeaders
-        )"""
-    return replace_required(s, old_headers, new_headers, "retry safe request headers")
+    if "requestHeaders = retryHeaders" not in s:
+        s, count = re.subn(
+            r"(overrideStreamUrl = entity\\.sourceUrl)(,?\\s*\\n\\s*\\))",
+            r"\\1,\\n            requestHeaders = retryHeaders\\2",
+            s,
+            count=1
+        )
+        if count != 1:
+            raise SystemExit("Could not add safe headers to retry quality.")
+    return s
 edit("app/src/main/java/com/example/ui/MainViewModel.kt", main_viewmodel_pause_resume)
 
 def main_activity_download_callbacks(s):
