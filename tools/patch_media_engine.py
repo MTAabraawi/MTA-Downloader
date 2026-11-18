@@ -234,6 +234,17 @@ if ads_dir.exists():
     import shutil
     shutil.rmtree(ads_dir)
 
+
+# Update tests to assert the ad-free behavior rather than the removed Start.io SDK.
+def tests(s):
+    s = s.replace("fun `app name and StartIo App ID match MTA Downloader specification`() {",
+                  "fun `app name and ad-free catalog match MTA Downloader specification`() {")
+    s = s.replace('        assertEquals("210745939", MTADownloaderApp.STARTIO_APP_ID)\n', "")
+    s = s.replace("assertTrue(repo.getFeaturedVideos().isNotEmpty())",
+                  "assertTrue(repo.getFeaturedVideos().isEmpty())")
+    return s
+edit("app/src/test/java/com/example/ExampleRobolectricTest.kt", tests)
+
 # Verify the Android source no longer contains ad SDK IDs, permissions, callbacks, or libraries.
 scan_roots = [root / "app/src/main", root / "app/build.gradle.kts"]
 patterns = re.compile(r"StartApp|StartIo|Start\.io|210745939|AD_ID|onVideoCompleted|com\.startapp|rewarded.?ad", re.I)
