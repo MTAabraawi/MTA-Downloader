@@ -75,7 +75,7 @@ def main():
         except (OSError, zipfile.BadZipFile):
             continue
 
-    ffmpeg_pattern = re.compile(r"(?:^|[/!])(?:lib)?(?:avcodec|avformat|avutil|swresample|swscale|ffmpeg)(?:[._-]|$)|ffmpegkit", re.I)
+    ffmpeg_pattern = re.compile(r"(?:^|[/!])(?:lib)?(?:avcodec|avformat|avutil|avfilter|avdevice|postproc|swresample|swscale|ffmpeg)(?:[._-]|$)|ffmpegkit", re.I)
     apk_ffmpeg = [name for name in apk_entries if ffmpeg_pattern.search(name)]
     aar_ffmpeg = [name for name in aar_entries if ffmpeg_pattern.search(name)]
     ffmpeg_components = [c for c in components if "ffmpeg" in c.get("name", "").lower() or "ffmpegkit" in c.get("name", "").lower()]
