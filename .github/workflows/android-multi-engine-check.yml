@@ -11,6 +11,7 @@ on:
       - 'tools/audit_sbom.py'
       - 'tools/inspect_embedded_python.py'
       - 'tools/package_corresponding_source.sh'
+      - 'tools/package_python_sources.py'
       - 'tools/cyclonedx.init.gradle.kts'
       - 'THIRD-PARTY-NOTICES.md'
       - 'docs/**'
