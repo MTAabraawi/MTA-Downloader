@@ -38,7 +38,6 @@ jobs:
           set -euo pipefail
           mkdir project
           unzip -q mta-downloader-nov-17-2026-10-15-48-pm.zip -d project
-          python3 tools/apply_adfree_redesign.py project
           cp -a project-overlay/. project/
           python3 tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt
       - name: Enforce ad-free source invariant
