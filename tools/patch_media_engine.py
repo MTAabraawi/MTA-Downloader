@@ -353,8 +353,8 @@ def normalize_download_media_types(s):
         '"mp3", "m4a", "aac", "wav", "ogg", "opus", "flv", "mkv", "ts", "vtt"'
     )
     s = s.replace(
-        '"mp3" -> "audio/mpeg"\\n            "m4a" -> "audio/mp4"',
-        '"mp3" -> "audio/mpeg"\\n            "m4a" -> "audio/mp4"\\n            "aac" -> "audio/aac"\\n            "wav" -> "audio/wav"\\n            "ogg" -> "audio/ogg"\\n            "flv" -> "video/x-flv"'
+        '"mp3" -> "audio/mpeg"\n            "m4a" -> "audio/mp4"',
+        '"mp3" -> "audio/mpeg"\n            "m4a" -> "audio/mp4"\n            "aac" -> "audio/aac"\n            "wav" -> "audio/wav"\n            "ogg" -> "audio/ogg"\n            "flv" -> "video/x-flv"'
     )
     return s
 edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", normalize_download_media_types)
