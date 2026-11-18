@@ -154,11 +154,19 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text("\n".join(lines), encoding="utf-8")
     manifest = args.output.with_name("embedded-python-packages.json")
+    previous_manifest = {}
+    if manifest.is_file():
+        try:
+            previous_manifest = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            previous_manifest = {}
     manifest.write_text(json.dumps({
         "wrapper": "dev.ffmpegkit-maintained:yt-dlp-android:2.0.2",
         "aar_files_inspected": [str(path) for path in aar_candidates],
-        "python_distributions": python_packages,
-        "metadata_found": bool(python_packages),
+        "python_distributions": python_packages or previous_manifest.get("python_distributions", []),
+        "version_hints_from_sources": previous_manifest.get("version_hints_from_sources", {}),
+        "relevant_archive_entries": previous_manifest.get("relevant_archive_entries", []),
+        "metadata_found": bool(python_packages or previous_manifest.get("python_distributions")),
     }, indent=2), encoding="utf-8")
     print("Wrote " + str(args.output) + "; components=" + str(len(components)) + ", missing_license_metadata=" + str(len(missing)) + ", ffmpeg_apk=" + str(len(apk_ffmpeg)) + ", ffmpeg_aar=" + str(len(aar_ffmpeg)))
 
