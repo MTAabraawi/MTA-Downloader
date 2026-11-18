@@ -414,10 +414,10 @@ edit("app/src/main/java/com/example/data/local/DownloadEntity.kt", lambda s: rep
 ))
 
 def database_migration(s):
-    s = s.replace("import androidx.room.RoomDatabase\\n",
+    s = s.replace("import androidx.room.RoomDatabase\n",
                   "import androidx.room.RoomDatabase\\nimport androidx.room.migration.Migration\\nimport androidx.sqlite.db.SupportSQLiteDatabase\\n")
     s = s.replace("    version = 1,", "    version = 2,")
-    s = s.replace("    companion object {\\n", """    companion object {
+    s = s.replace("    companion object {\n", """    companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE downloads ADD COLUMN requestHeadersJson TEXT NOT NULL DEFAULT ''")
