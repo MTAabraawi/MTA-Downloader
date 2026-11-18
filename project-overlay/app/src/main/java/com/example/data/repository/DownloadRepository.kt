@@ -19,7 +19,12 @@ import dev.ffmpegkit_maintained.ytdlp.YtDlpRequest
 import java.io.File
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.ConcurrentHashMap
+import org.json.JSONObject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -33,6 +38,8 @@ class DownloadRepository(
     private val downloadDao: DownloadDao
 ) {
     private val segmentedDownloader by lazy { SegmentedHttpDownloader() }
+    private val segmentedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val segmentedJobs = ConcurrentHashMap<Long, Deferred<File?>>()
 
     private val downloadManager: DownloadManager by lazy {
         context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
@@ -42,12 +49,13 @@ class DownloadRepository(
 
     suspend fun enqueueDownload(
         request: PendingDownloadRequest,
-        quality: QualityOption
+        quality: QualityOption,
+        resumeEntity: DownloadEntity? = null
     ): Result<Long> = withContext(Dispatchers.IO) {
         runCatching {
             val targetStreamUrl = quality.overrideStreamUrl?.takeIf { it.isNotBlank() } ?: request.streamUrl
             validateDownloadUrl(targetStreamUrl)
-            if (!isDirectMediaUrl(targetStreamUrl) && !quality.id.startsWith("newpipe_")) {
+            if (resumeEntity == null && !isDirectMediaUrl(targetStreamUrl) && !quality.id.startsWith("newpipe_")) {
                 return@runCatching downloadWithYtDlp(request, quality, targetStreamUrl)
             }
 
@@ -56,9 +64,19 @@ class DownloadRepository(
                 .trim()
                 .take(48)
                 .ifBlank { "mta_video_${System.currentTimeMillis()}" }
-            val fileName = "${sanitizedName}_${quality.id}.${quality.extension}"
+            val fileName = resumeEntity?.fileName ?: "${sanitizedName}_${quality.id}.${quality.extension}"
 
-            val entity = DownloadEntity(
+            val entity = resumeEntity?.copy(
+                systemDownloadId = 0L,
+                sourceUrl = targetStreamUrl,
+                sourcePlatform = request.sourcePlatform,
+                qualityLabel = quality.label,
+                format = quality.format,
+                status = DownloadStatus.DOWNLOADING.name,
+                progress = 0,
+                localUri = null,
+                requestHeadersJson = encodeRequestHeaders(quality.requestHeaders)
+            ) ?: DownloadEntity(
                 systemDownloadId = 0L,
                 title = request.title,
                 sourceUrl = targetStreamUrl,
@@ -69,9 +87,15 @@ class DownloadRepository(
                 status = DownloadStatus.DOWNLOADING.name,
                 progress = 0,
                 thumbnailUrl = request.thumbnailUrl,
-                thumbnailResId = request.thumbnailRes
+                thumbnailResId = request.thumbnailRes,
+                requestHeadersJson = encodeRequestHeaders(quality.requestHeaders)
             )
-            val entityId = downloadDao.insert(entity)
+            val entityId = if (resumeEntity != null) {
+                downloadDao.update(entity)
+                resumeEntity.id
+            } else {
+                downloadDao.insert(entity)
+            }
             val trackedEntity = entity.copy(id = entityId)
             val appDownloads = requireNotNull(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)) {
                 "مساحة التخزين غير متاحة"
@@ -81,8 +105,12 @@ class DownloadRepository(
             val segmentedTarget = File(segmentedDirectory, fileName)
             val progressScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             val lastProgressAt = AtomicLong(0L)
-            val segmentedFile = try {
-                segmentedDownloader.downloadIfResumable(targetStreamUrl, segmentedTarget, headers = safeRequestHeaders(quality.requestHeaders)) { progress ->
+            val segmentedTask = segmentedScope.async {
+                segmentedDownloader.downloadIfResumable(
+                    targetStreamUrl,
+                    segmentedTarget,
+                    headers = safeRequestHeaders(quality.requestHeaders)
+                ) { progress ->
                     val now = System.currentTimeMillis()
                     if (now - lastProgressAt.get() >= 800L && lastProgressAt.getAndSet(now) <= now) {
                         progressScope.launch {
@@ -98,10 +126,20 @@ class DownloadRepository(
                         }
                     }
                 }
+            }
+            segmentedJobs[entityId] = segmentedTask
+            val segmentedFile = try {
+                segmentedTask.await()
+            } catch (cancelled: CancellationException) {
+                progressScope.cancel()
+                downloadDao.update(trackedEntity.copy(status = DownloadStatus.PAUSED.name))
+                return@runCatching entityId
             } catch (error: Throwable) {
                 progressScope.cancel()
                 downloadDao.update(trackedEntity.copy(status = DownloadStatus.FAILED.name))
                 throw error
+            } finally {
+                segmentedJobs.remove(entityId, segmentedTask)
             }
 
             if (segmentedFile != null) {
@@ -145,6 +183,62 @@ class DownloadRepository(
                 )
             )
             entityId
+        }
+    }
+
+    private fun encodeRequestHeaders(headers: Map<String, String>): String =
+        JSONObject(safeRequestHeaders(headers)).toString()
+
+    fun requestHeadersFor(entity: DownloadEntity): Map<String, String> =
+        decodeRequestHeaders(entity.requestHeadersJson)
+
+    private fun decodeRequestHeaders(encoded: String): Map<String, String> = runCatching {
+        val json = JSONObject(encoded)
+        json.keys().asSequence().associateWith { key -> json.getString(key) }
+    }.getOrDefault(emptyMap())
+
+    suspend fun pauseDownload(entity: DownloadEntity): Boolean = withContext(Dispatchers.IO) {
+        val task = segmentedJobs[entity.id] ?: return@withContext false
+        task.cancel(CancellationException("Paused by user"))
+        downloadDao.update(entity.copy(status = DownloadStatus.PAUSED.name))
+        true
+    }
+
+    suspend fun resumeDownload(entity: DownloadEntity): Result<Long> = withContext(Dispatchers.IO) {
+        runCatching {
+            require(entity.status == DownloadStatus.PAUSED.name) { "التنزيل ليس متوقفاً مؤقتاً" }
+            val extension = entity.fileName.substringAfterLast('.', entity.format.lowercase())
+                .lowercase().filter { it.isLetterOrDigit() }.ifBlank { "mp4" }
+            val mime = when (extension) {
+                "mp3" -> "audio/mpeg"
+                "m4a", "aac" -> "audio/mp4"
+                "webm" -> "video/webm"
+                "mov" -> "video/quicktime"
+                "mkv" -> "video/x-matroska"
+                "vtt" -> "text/vtt"
+                "srt" -> "application/x-subrip"
+                else -> "video/mp4"
+            }
+            val headers = decodeRequestHeaders(entity.requestHeadersJson)
+            val quality = QualityOption(
+                id = "newpipe_resume",
+                label = entity.qualityLabel,
+                format = entity.format,
+                sizeEstimate = "استئناف التنزيل",
+                extension = extension,
+                mimeType = mime,
+                overrideStreamUrl = entity.sourceUrl,
+                requestHeaders = headers
+            )
+            val request = PendingDownloadRequest(
+                title = entity.title,
+                streamUrl = entity.sourceUrl,
+                sourcePlatform = entity.sourcePlatform,
+                thumbnailUrl = entity.thumbnailUrl,
+                thumbnailRes = entity.thumbnailResId,
+                qualities = listOf(quality)
+            )
+            enqueueDownload(request, quality, resumeEntity = entity).getOrThrow()
         }
     }
 
