@@ -256,7 +256,7 @@ def model(s):
 edit("app/src/main/java/com/example/data/model/VideoModels.kt", model)
 
 def vm_import(s):
-    return s.replace("import com.example.data.model.defaultVideoQualities\\n", "")
+    return s.replace("import com.example.data.model.defaultVideoQualities\n", "")
 edit("app/src/main/java/com/example/ui/MainViewModel.kt", vm_import)
 
 # Offer honest automatic video/audio selectors for unresolved pages; do not invent resolutions.
