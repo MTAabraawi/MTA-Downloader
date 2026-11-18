@@ -8,6 +8,7 @@ import android.provider.MediaStore
 import android.net.Uri
 import android.os.Environment
 import com.example.data.download.SegmentedHttpDownloader
+import com.example.data.media.MediaProcessingEngine
 import com.example.data.local.DownloadDao
 import com.example.data.local.DownloadEntity
 import com.example.data.model.DownloadStatus
@@ -29,6 +30,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.flow.Flow
@@ -41,6 +43,7 @@ class DownloadRepository(
     private val downloadDao: DownloadDao
 ) {
     private val segmentedDownloader by lazy { SegmentedHttpDownloader() }
+    private val mediaProcessingEngine by lazy { MediaProcessingEngine(context) }
     private val segmentedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val segmentedJobs = ConcurrentHashMap<Long, Deferred<File?>>()
     private val segmentedSemaphore = Semaphore(2)
@@ -59,6 +62,10 @@ class DownloadRepository(
         runCatching {
             val targetStreamUrl = quality.overrideStreamUrl?.takeIf { it.isNotBlank() } ?: request.streamUrl
             validateDownloadUrl(targetStreamUrl)
+            quality.audioStreamUrl?.let(::validateDownloadUrl)
+            if (!quality.audioStreamUrl.isNullOrBlank()) {
+                return@runCatching downloadSeparateStreams(request, quality, targetStreamUrl, resumeEntity)
+            }
             val isCapturedManifest = quality.id.startsWith("captured_manifest_")
             if (resumeEntity == null && (isCapturedManifest ||
                 (!isDirectMediaUrl(targetStreamUrl) &&
@@ -197,24 +204,125 @@ class DownloadRepository(
         }
     }
 
-    private fun encodeRequestHeaders(headers: Map<String, String>): String {
-        val persistent = safeRequestHeaders(headers).mapValues { (name, value) ->
-            if (name.equals("Referer", ignoreCase = true)) {
-                runCatching {
-                    Uri.parse(value).buildUpon().clearQuery().fragment(null).build().toString()
-                }.getOrDefault(value.substringBefore("?").substringBefore("#"))
-            } else value
+    private fun encodeRequestHeaders(headers: Map<String, String>, audioStreamUrl: String? = null,
+        audioHeaders: Map<String, String> = emptyMap()): String {
+        val persistent = JSONObject()
+        safeRequestHeaders(headers).forEach { (name, value) ->
+            persistent.put(name, if (name.equals("Referer", true)) {
+                runCatching { Uri.parse(value).buildUpon().clearQuery().fragment(null).build().toString() }
+                    .getOrDefault(value.substringBefore("?").substringBefore("#"))
+            } else value)
         }
-        return JSONObject(persistent).toString()
+        audioStreamUrl?.takeIf { it.isNotBlank() }?.let { persistent.put("__mta_audio_url", it) }
+        if (audioHeaders.isNotEmpty()) persistent.put("__mta_audio_headers", JSONObject(safeRequestHeaders(audioHeaders)))
+        return persistent.toString()
     }
 
     fun requestHeadersFor(entity: DownloadEntity): Map<String, String> =
-        decodeRequestHeaders(entity.requestHeadersJson)
+        safeRequestHeaders(decodeRequestHeaders(entity.requestHeadersJson))
 
     private fun decodeRequestHeaders(encoded: String): Map<String, String> = runCatching {
         val json = JSONObject(encoded)
-        json.keys().asSequence().associateWith { key -> json.getString(key) }
+        json.keys().asSequence().filter { !it.startsWith("__mta_") }
+            .mapNotNull { key -> json.optString(key).takeIf { it.isNotBlank() }?.let { key to it } }.toMap()
     }.getOrDefault(emptyMap())
+
+    private fun decodeAudioStreamUrl(encoded: String): String? = runCatching {
+        JSONObject(encoded).optString("__mta_audio_url").takeIf { it.isNotBlank() }
+    }.getOrNull()
+
+    private fun decodeAudioRequestHeaders(encoded: String): Map<String, String> = runCatching {
+        val json = JSONObject(encoded).optJSONObject("__mta_audio_headers") ?: return@runCatching emptyMap()
+        json.keys().asSequence().mapNotNull { key ->
+            json.optString(key).takeIf { it.isNotBlank() }?.let { key to it }
+        }.toMap().let(::safeRequestHeaders)
+    }.getOrDefault(emptyMap())
+
+
+    /** Download the video and audio tracks separately, mux with FFmpeg, then publish one file. */
+    private suspend fun downloadSeparateStreams(request: PendingDownloadRequest, quality: QualityOption,
+        videoUrl: String, resumeEntity: DownloadEntity?): Long {
+        val audioUrl = requireNotNull(quality.audioStreamUrl?.takeIf { it.isNotBlank() })
+        validateDownloadUrl(audioUrl)
+        val root = requireNotNull(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)) { "مساحة التخزين غير متاحة" }
+        val directory = File(root, "MTA_Downloader")
+        check(directory.exists() || directory.mkdirs()) { "تعذر إنشاء مجلد التنزيلات" }
+        val safeTitle = request.title.replace(Regex("[^a-zA-Z0-9\\u0600-\\u06FF._ -]"), "_")
+            .trim().take(48).ifBlank { "mta_video_${System.currentTimeMillis()}" }
+        val safeId = quality.id.replace(Regex("[^a-zA-Z0-9_-]"), "_").take(40)
+        val fileName = resumeEntity?.fileName ?: "${safeTitle}_${safeId}.mkv"
+        require(File(fileName).name == fileName && fileName.endsWith(".mkv", true)) { "اسم ملف الدمج غير صالح" }
+        val output = File(directory, fileName)
+        val video = File(directory, fileName + ".video")
+        val audio = File(directory, fileName + ".audio")
+        output.delete(); video.delete(); audio.delete()
+        val headersJson = encodeRequestHeaders(quality.requestHeaders, audioUrl, quality.audioRequestHeaders)
+        val row = resumeEntity?.copy(
+            systemDownloadId = 0L, sourceUrl = videoUrl, sourcePlatform = request.sourcePlatform,
+            qualityLabel = quality.label, format = "Matroska (video + audio)", fileName = fileName,
+            status = DownloadStatus.QUEUED.name, progress = 0, downloadedBytes = 0L, totalBytes = 0L,
+            localUri = null, requestHeadersJson = headersJson
+        ) ?: DownloadEntity(
+            systemDownloadId = 0L, title = request.title, sourceUrl = videoUrl,
+            sourcePlatform = request.sourcePlatform, qualityLabel = quality.label,
+            format = "Matroska (video + audio)", fileName = fileName, status = DownloadStatus.QUEUED.name,
+            progress = 0, thumbnailUrl = request.thumbnailUrl, thumbnailResId = request.thumbnailRes,
+            requestHeadersJson = headersJson
+        )
+        val id = if (resumeEntity != null) { downloadDao.update(row); resumeEntity.id } else downloadDao.insert(row)
+        val tracked = row.copy(id = id)
+        val vBytes = AtomicLong(0); val aBytes = AtomicLong(0); val vTotal = AtomicLong(0); val aTotal = AtomicLong(0)
+        val lastUpdate = AtomicLong(0)
+        val progressScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val job = segmentedScope.async {
+            segmentedSemaphore.withPermit {
+                downloadDao.update(tracked.copy(status = DownloadStatus.DOWNLOADING.name))
+                coroutineScope {
+                    val v = async { segmentedDownloader.downloadToFile(videoUrl, video, safeRequestHeaders(quality.requestHeaders)) {
+                        vBytes.set(it.downloadedBytes); vTotal.set(it.totalBytes.coerceAtLeast(0))
+                        reportMuxProgress(tracked, vBytes, aBytes, vTotal, aTotal, lastUpdate, progressScope)
+                    } }
+                    val a = async { segmentedDownloader.downloadToFile(audioUrl, audio, safeRequestHeaders(quality.audioRequestHeaders)) {
+                        aBytes.set(it.downloadedBytes); aTotal.set(it.totalBytes.coerceAtLeast(0))
+                        reportMuxProgress(tracked, vBytes, aBytes, vTotal, aTotal, lastUpdate, progressScope)
+                    } }
+                    v.await(); a.await()
+                }
+                mediaProcessingEngine.mergeFiles(video, audio, output).getOrThrow()
+            }
+        }
+        segmentedJobs[id] = job
+        val merged = try { job.await() }
+        catch (cancelled: CancellationException) {
+            progressScope.cancel(); video.delete(); audio.delete(); output.delete()
+            downloadDao.update(tracked.copy(status = DownloadStatus.PAUSED.name))
+            return id
+        } catch (error: Throwable) {
+            progressScope.cancel(); video.delete(); audio.delete(); output.delete()
+            downloadDao.update(tracked.copy(status = DownloadStatus.FAILED.name))
+            throw error
+        } finally { progressScope.cancel(); segmentedJobs.remove(id, job) }
+        video.delete(); audio.delete()
+        val uri = try { publishToDownloads(merged, request.title) }
+        catch (error: Throwable) {
+            merged.delete(); downloadDao.update(tracked.copy(status = DownloadStatus.FAILED.name)); throw error
+        }
+        downloadDao.update(tracked.copy(format = "MKV", fileName = merged.name, localUri = uri.toString(),
+            status = DownloadStatus.COMPLETED.name, progress = 100,
+            downloadedBytes = merged.length(), totalBytes = merged.length()))
+        if (uri.scheme == "content") merged.delete()
+        return id
+    }
+
+    private fun reportMuxProgress(entity: DownloadEntity, vBytes: AtomicLong, aBytes: AtomicLong,
+        vTotal: AtomicLong, aTotal: AtomicLong, lastUpdate: AtomicLong, scope: CoroutineScope) {
+        val now = System.currentTimeMillis()
+        if (now - lastUpdate.getAndSet(now) < 800L) return
+        val downloaded = vBytes.get() + aBytes.get()
+        val total = vTotal.get() + aTotal.get()
+        val percent = if (total > 0L) ((downloaded * 100L) / total).toInt().coerceIn(0, 94) else 0
+        scope.launch { downloadDao.update(entity.copy(progress = percent, downloadedBytes = downloaded, totalBytes = total)) }
+    }
 
     suspend fun pauseDownload(entity: DownloadEntity): Boolean = withContext(Dispatchers.IO) {
         val task = segmentedJobs[entity.id] ?: return@withContext false
@@ -241,15 +349,14 @@ class DownloadRepository(
                 else -> "video/mp4"
             }
             val headers = decodeRequestHeaders(entity.requestHeadersJson)
+            val audioUrl = decodeAudioStreamUrl(entity.requestHeadersJson)
             val quality = QualityOption(
-                id = "newpipe_resume",
-                label = entity.qualityLabel,
-                format = entity.format,
-                sizeEstimate = "استئناف التنزيل",
-                extension = extension,
-                mimeType = mime,
-                overrideStreamUrl = entity.sourceUrl,
-                requestHeaders = headers
+                id = if (audioUrl != null) "newpipe_mux_resume" else "newpipe_resume",
+                label = entity.qualityLabel, format = entity.format, sizeEstimate = "استئناف التنزيل",
+                extension = if (audioUrl != null) "mkv" else extension,
+                mimeType = if (audioUrl != null) "video/x-matroska" else mime,
+                overrideStreamUrl = entity.sourceUrl, requestHeaders = safeRequestHeaders(headers),
+                audioStreamUrl = audioUrl, audioRequestHeaders = decodeAudioRequestHeaders(entity.requestHeadersJson)
             )
             val request = PendingDownloadRequest(
                 title = entity.title,
@@ -616,7 +723,9 @@ class DownloadRepository(
         listOf(
             fileName + ".mta-resume",
             fileName + ".mta-resume.tmp",
-            fileName + ".mta-assembling"
+            fileName + ".mta-assembling",
+            fileName + ".video", fileName + ".video.download-part",
+            fileName + ".audio", fileName + ".audio.download-part"
         ).forEach { File(directory, it).delete() }
         directory.listFiles()?.filter { it.name.startsWith(fileName + ".mta-part-") }?.forEach { it.delete() }
     }

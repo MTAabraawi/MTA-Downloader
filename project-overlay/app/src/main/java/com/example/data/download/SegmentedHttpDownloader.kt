@@ -8,12 +8,15 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.net.InetAddress
 import java.io.IOException
 import java.util.Properties
 import java.util.concurrent.TimeUnit
@@ -105,6 +108,69 @@ class SegmentedHttpDownloader(
         checkpoint.delete()
         destination
     }
+
+
+    /** Full HTTPS transfer for adaptive tracks that must both be local before muxing. */
+    suspend fun downloadToFile(url: String, destination: File, headers: Map<String, String> = emptyMap(),
+        onProgress: (SegmentedDownloadProgress) -> Unit = {}): File = withContext(Dispatchers.IO) {
+        require(url.startsWith("https://", true)) { "Only HTTPS downloads are supported" }
+        val parent = destination.absoluteFile.parentFile ?: throw IOException("Missing destination directory")
+        check(parent.exists() || parent.mkdirs()) { "Could not create download directory" }
+        val temporary = File(parent, destination.name + ".download-part")
+        temporary.delete()
+        val request = Request.Builder().url(url).get().apply {
+            headers.forEach { (name, value) -> header(name, value) }
+        }.build()
+        val call = client.newCall(request)
+        val cancellation = currentCoroutineContext()[Job]?.invokeOnCompletion { cause ->
+            if (cause is CancellationException) call.cancel()
+        }
+        try {
+            call.execute().use { response ->
+                check(response.isSuccessful) { "Media server returned HTTP ${response.code}" }
+                val finalUrl = response.request.url
+                check(finalUrl.isHttps && isPublicHost(finalUrl.host)) { "Redirect resolved to an insecure or private host" }
+                val contentType = response.header("Content-Type").orEmpty().substringBefore(';').trim()
+                check(!contentType.equals("text/html", true) && !contentType.contains("json", true)) {
+                    "Media URL returned a page or JSON instead of media"
+                }
+                val body = response.body ?: throw IOException("Media response body is empty")
+                val total = body.contentLength()
+                var downloaded = 0L
+                FileOutputStream(temporary).use { output ->
+                    body.byteStream().use { input ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (true) {
+                            currentCoroutineContext().ensureActive()
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            output.write(buffer, 0, count)
+                            downloaded += count
+                            onProgress(SegmentedDownloadProgress(downloaded, total, 0, 1))
+                        }
+                    }
+                }
+                check(downloaded > 0L) { "Media stream is empty" }
+                if (total > 0L) check(downloaded == total) { "Media transfer was truncated" }
+            }
+            currentCoroutineContext().ensureActive()
+            if (destination.exists()) check(destination.delete()) { "Could not replace previous media file" }
+            check(temporary.renameTo(destination)) { "Could not finalize media file" }
+            destination
+        } catch (error: Throwable) {
+            temporary.delete()
+            throw error
+        } finally { cancellation?.dispose() }
+    }
+
+    private fun isPublicHost(host: String): Boolean = runCatching {
+        val normalized = host.lowercase().trimEnd('.')
+        if (normalized == "localhost" || normalized.endsWith(".localhost") || normalized.endsWith(".local")) return@runCatching false
+        InetAddress.getAllByName(normalized).all { address ->
+            !address.isAnyLocalAddress && !address.isLoopbackAddress && !address.isLinkLocalAddress &&
+                !address.isSiteLocalAddress && !address.isMulticastAddress
+        }
+    }.getOrDefault(false)
 
     private data class Probe(
         val total: Long,

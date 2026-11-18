@@ -77,6 +77,10 @@ jobs:
           fi
           ! grep -q 'com.startapp:inapp-sdk' project/app/build.gradle.kts
           ! grep -q 'com.google.android.gms.permission.AD_ID' project/app/src/main/AndroidManifest.xml
+          grep -q 'quality.audioStreamUrl' project/app/src/main/java/com/example/data/repository/DownloadRepository.kt
+          grep -q 'mediaProcessingEngine.mergeFiles(video, audio, output)' project/app/src/main/java/com/example/data/repository/DownloadRepository.kt
+          grep -q 'audioStreamUrl = bestAudioStream.content' project/app/src/main/java/com/example/data/extractor/NewPipeMediaProvider.kt
+          test -s project/app/src/androidTest/java/com/example/data/media/MediaProcessingEngineInstrumentedTest.kt
       - name: Run unit tests and lint
         working-directory: project
         run: |
@@ -101,6 +105,17 @@ jobs:
       - name: Build debug APK with embedded SBOM
         working-directory: project
         run: gradle --no-daemon --no-configuration-cache assembleDebug
+      - name: Run real FFmpeg mux integration test on x86_64 Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            cd project
+            gradle --no-daemon --no-configuration-cache connectedDebugAndroidTest
       - name: Audit SBOM, AAR and APK for licenses and FFmpeg
         working-directory: project
         run: |
@@ -129,6 +144,8 @@ jobs:
             project/build/reports/embedded-python-packages.json
             MTA-DOWNLOADER-CORRESPONDING-SOURCE.zip
             project/app/build/test-results/**
+            project/app/build/outputs/androidTest-results/**
+            project/app/build/reports/androidTests/**
             project/app/src/main/**
             project/app/build.gradle.kts
           if-no-files-found: warn

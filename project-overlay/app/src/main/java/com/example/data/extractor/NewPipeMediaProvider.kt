@@ -85,62 +85,57 @@ internal object NewPipeMediaProvider {
             val extractor = service.getStreamExtractor(url)
             extractor.fetchPage()
 
+            val bestAudioStream = extractor.audioStreams
+                .filter { it.content.startsWith("https://", true) }
+                .maxByOrNull { it.averageBitrate }
+
             val formats = buildList {
-                extractor.videoStreams
-                    .filterNot { it.isVideoOnly }
-                    .forEach { stream ->
-                        val mediaUrl = stream.content
-                        if (mediaUrl.startsWith("https://", true)) {
-                            val format = stream.format ?: return@forEach
-                            add(
-                                com.example.data.model.QualityOption(
-                                    id = "newpipe_video_${stream.resolution.lowercase().replace(Regex("[^a-z0-9]+"), "_")}_${format.suffix}",
-                                    label = stream.resolution,
-                                    format = "${format.name} • ${stream.fps} FPS",
-                                    sizeEstimate = "الحجم غير متاح من المصدر",
-                                    extension = format.suffix,
-                                    mimeType = format.mimeType,
-                                    overrideStreamUrl = mediaUrl
-                                )
-                            )
-                        }
+                extractor.videoStreams.filterNot { it.isVideoOnly }.forEach { stream ->
+                    val mediaUrl = stream.content
+                    if (mediaUrl.startsWith("https://", true)) {
+                        val format = stream.format ?: return@forEach
+                        add(com.example.data.model.QualityOption(
+                            id = "newpipe_video_${stream.resolution.lowercase().replace(Regex("[^a-z0-9]+"), "_")}_${format.suffix}",
+                            label = stream.resolution, format = "${format.name} • ${stream.fps} FPS",
+                            sizeEstimate = "الحجم غير متاح من المصدر", extension = format.suffix,
+                            mimeType = format.mimeType, overrideStreamUrl = mediaUrl
+                        ))
                     }
+                }
+                if (bestAudioStream != null) {
+                    extractor.videoStreams.filter { it.isVideoOnly && it.content.startsWith("https://", true) }
+                        .forEach { stream ->
+                            val format = stream.format ?: return@forEach
+                            val audioFormat = bestAudioStream.format ?: return@forEach
+                            add(com.example.data.model.QualityOption(
+                                id = "newpipe_mux_${stream.resolution.lowercase().replace(Regex("[^a-z0-9]+"), "_")}_${format.suffix}",
+                                label = "${stream.resolution} • صوت ${bestAudioStream.averageBitrate} kbit/s",
+                                format = "${format.name} + ${audioFormat.name} (FFmpeg)",
+                                sizeEstimate = "الحجم غير متاح من المصدر", extension = "mkv",
+                                mimeType = "video/x-matroska", overrideStreamUrl = stream.content,
+                                audioStreamUrl = bestAudioStream.content
+                            ))
+                        }
+                }
                 extractor.audioStreams.forEach { stream ->
                     val mediaUrl = stream.content
                     if (mediaUrl.startsWith("https://", true)) {
                         val format = stream.format ?: return@forEach
-                        add(
-                            com.example.data.model.QualityOption(
-                                id = "newpipe_audio_${format.suffix}_${stream.averageBitrate}",
-                                label = "صوت • ${stream.averageBitrate} kbit/s",
-                                format = format.name,
-                                sizeEstimate = "الحجم غير متاح من المصدر",
-                                extension = format.suffix,
-                                mimeType = format.mimeType,
-                                overrideStreamUrl = mediaUrl
-                            )
-                        )
+                        add(com.example.data.model.QualityOption(
+                            id = "newpipe_audio_${format.suffix}_${stream.averageBitrate}",
+                            label = "صوت • ${stream.averageBitrate} kbit/s", format = format.name,
+                            sizeEstimate = "الحجم غير متاح من المصدر", extension = format.suffix,
+                            mimeType = format.mimeType, overrideStreamUrl = mediaUrl
+                        ))
                     }
                 }
-
                 extractor.subtitlesDefault.forEach { stream ->
-                    val subtitleUrl = stream.content
                     val format = stream.format ?: return@forEach
-                    if (subtitleUrl.startsWith("https://", true)) {
-                        val language = stream.displayLanguageName.ifBlank { stream.languageTag }
-                        val generated = if (stream.isAutoGenerated) " • تلقائية" else ""
-                        add(
-                            com.example.data.model.QualityOption(
-                                id = "newpipe_subtitle_${stream.languageTag}_${format.suffix}",
-                                label = "ترجمة • ${language}${generated}",
-                                format = format.name,
-                                sizeEstimate = "حجم غير متاح",
-                                extension = format.suffix,
-                                mimeType = format.mimeType,
-                                overrideStreamUrl = subtitleUrl
-                            )
-                        )
-                    }
+                    NewPipeSubtitleMapper.toQualityOption(
+                        url = stream.content, languageTag = stream.languageTag,
+                        displayLanguageName = stream.displayLanguageName, isAutoGenerated = stream.isAutoGenerated,
+                        formatSuffix = format.suffix, formatName = format.name, mimeType = format.mimeType
+                    )?.let(::add)
                 }
             }.distinctBy { it.id }
 
