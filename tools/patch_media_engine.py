@@ -433,6 +433,141 @@ def database_migration(s):
     return s
 edit("app/src/main/java/com/example/data/local/AppDatabase.kt", database_migration)
 
+
+# Expose segmented pause/resume in the existing download manager UI.
+def main_viewmodel_pause_resume(s):
+    old = """    fun deleteDownload(entity: DownloadEntity) {
+        viewModelScope.launch {
+            downloadRepository.deleteDownload(entity)
+            _snackbarMessage.value = "تم حذف الملف من القائمة"
+        }
+    }
+
+"""
+    new = """    fun deleteDownload(entity: DownloadEntity) {
+        viewModelScope.launch {
+            downloadRepository.deleteDownload(entity)
+            _snackbarMessage.value = "تم حذف الملف من القائمة"
+        }
+    }
+
+    fun pauseDownload(entity: DownloadEntity) {
+        viewModelScope.launch {
+            val paused = downloadRepository.pauseDownload(entity)
+            _snackbarMessage.value = if (paused) "تم إيقاف التنزيل مؤقتاً" else "هذا التنزيل لا يدعم الإيقاف المؤقت"
+        }
+    }
+
+    fun resumeDownload(entity: DownloadEntity) {
+        viewModelScope.launch {
+            val result = downloadRepository.resumeDownload(entity)
+            result.onSuccess {
+                _snackbarMessage.value = "تم استئناف التنزيل"
+            }.onFailure { error ->
+                _snackbarMessage.value = "تعذر استئناف التنزيل: " + (error.localizedMessage ?: "خطأ غير معروف")
+            }
+        }
+    }
+
+"""
+    s = replace_required(s, old, new, "MainViewModel pause and resume actions")
+    old_retry = """            mimeType = mimeType,
+            overrideStreamUrl = entity.sourceUrl
+        )"""
+    new_retry = """            mimeType = mimeType,
+            overrideStreamUrl = entity.sourceUrl,
+            requestHeaders = downloadRepository.requestHeadersFor(entity)
+        )"""
+    return replace_required(s, old_retry, new_retry, "retry request headers")
+edit("app/src/main/java/com/example/ui/MainViewModel.kt", main_viewmodel_pause_resume)
+
+def main_activity_download_callbacks(s):
+    old = """                                onRetryDownload = viewModel::retryDownload,
+                                onDeleteDownload = viewModel::deleteDownload,
+                                onExploreVideosClick = { navigateTopLevel(HomeRoute) }"""
+    new = """                                onRetryDownload = viewModel::retryDownload,
+                                onDeleteDownload = viewModel::deleteDownload,
+                                onPauseDownload = viewModel::pauseDownload,
+                                onResumeDownload = viewModel::resumeDownload,
+                                onExploreVideosClick = { navigateTopLevel(HomeRoute) }"""
+    return replace_required(s, old, new, "DownloadsScreen pause resume callbacks")
+edit("app/src/main/java/com/example/MainActivity.kt", main_activity_download_callbacks)
+
+def downloads_screen_pause_resume(s):
+    s = s.replace("import androidx.compose.material.icons.filled.PlayArrow\\n",
+                  "import androidx.compose.material.icons.filled.PlayArrow\\nimport androidx.compose.material.icons.filled.Pause\\n")
+    s = s.replace(
+        "    onDeleteDownload: (DownloadEntity) -> Unit,\\n    onExploreVideosClick: () -> Unit,",
+        "    onDeleteDownload: (DownloadEntity) -> Unit,\\n    onPauseDownload: (DownloadEntity) -> Unit,\\n    onResumeDownload: (DownloadEntity) -> Unit,\\n    onExploreVideosClick: () -> Unit,"
+    )
+    s = s.replace(
+        "it.status == DownloadStatus.DOWNLOADING.name || it.status == DownloadStatus.QUEUED.name",
+        "it.status == DownloadStatus.DOWNLOADING.name || it.status == DownloadStatus.QUEUED.name || it.status == DownloadStatus.PAUSED.name",
+        1
+    )
+    s = s.replace(
+        "it.status == DownloadStatus.QUEUED.name ||\\n                    it.status == DownloadStatus.FAILED.name",
+        "it.status == DownloadStatus.QUEUED.name ||\\n                    it.status == DownloadStatus.PAUSED.name ||\\n                    it.status == DownloadStatus.FAILED.name"
+    )
+    s = s.replace(
+        "text = \\"$activeCount نشط • $completedCount مكتمل\\"",
+        "text = \\"$activeCount نشط/متوقف • $completedCount مكتمل\\""
+    )
+    s = s.replace(
+        "                    onDeleteClick = { onDeleteDownload(item) }",
+        "                    onDeleteClick = { onDeleteDownload(item) },\\n                    onPauseClick = { onPauseDownload(item) },\\n                    onResumeClick = { onResumeDownload(item) }"
+    )
+    s = s.replace(
+        "    onDeleteClick: () -> Unit\\n)",
+        "    onDeleteClick: () -> Unit,\\n    onPauseClick: () -> Unit,\\n    onResumeClick: () -> Unit\\n)"
+    )
+    s = s.replace(
+        "        DownloadStatus.FAILED -> MtaErrorRed\\n        else -> MtaNeonBlue",
+        "        DownloadStatus.FAILED -> MtaErrorRed\\n        DownloadStatus.PAUSED -> MtaTextSecondary\\n        else -> MtaNeonBlue"
+    )
+    s = s.replace(
+        "                            DownloadStatus.FAILED -> Icons.Filled.ErrorOutline\\n                            else -> Icons.Filled.CloudDownload",
+        "                            DownloadStatus.FAILED -> Icons.Filled.ErrorOutline\\n                            DownloadStatus.PAUSED -> Icons.Filled.Pause\\n                            else -> Icons.Filled.CloudDownload"
+    )
+    s = s.replace(
+        "if (status == DownloadStatus.DOWNLOADING || status == DownloadStatus.QUEUED)",
+        "if (status == DownloadStatus.DOWNLOADING || status == DownloadStatus.QUEUED || status == DownloadStatus.PAUSED)"
+    )
+    s = s.replace(
+        "                } else if (status == DownloadStatus.FAILED) {\\n                    \\"تعذر التحميل\\"",
+        "                } else if (status == DownloadStatus.FAILED) {\\n                    \\"تعذر التحميل\\"\\n                } else if (status == DownloadStatus.PAUSED) {\\n                    \\"متوقف مؤقتاً\\""
+    )
+    old = """                    DownloadStatus.FAILED -> {
+                        Button(
+                            onClick = onRetryClick,"""
+    new = """                    DownloadStatus.PAUSED -> {
+                        Button(
+                            onClick = onResumeClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = MtaSurfaceElevated),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp),
+                            modifier = Modifier.height(40.dp)
+                        ) {
+                            Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = null, tint = MtaCyanGlow)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("استئناف", color = MtaCyanGlow)
+                        }
+                    }
+                    DownloadStatus.DOWNLOADING -> {
+                        if (item.systemDownloadId == 0L && item.totalBytes > 0L) {
+                            IconButton(onClick = onPauseClick, modifier = Modifier.testTag("pause_download_\${item.id}")) {
+                                Icon(imageVector = Icons.Filled.Pause, contentDescription = "إيقاف مؤقت", tint = MtaCyanGlow)
+                            }
+                        }
+                    }
+                    DownloadStatus.QUEUED -> Unit
+                    DownloadStatus.FAILED -> {
+                        Button(
+                            onClick = onRetryClick,"""
+    s = replace_required(s, old, new, "DownloadsScreen pause and resume actions")
+    return s
+edit("app/src/main/java/com/example/ui/screens/DownloadsScreen.kt", downloads_screen_pause_resume)
+
 # Carry only non-secret browser request context in memory; never persist cookies or authorization tokens.
 def video_models_headers(s):
     old = """data class DetectedMediaStream(
