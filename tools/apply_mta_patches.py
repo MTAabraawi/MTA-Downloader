@@ -8,6 +8,10 @@ def edit(path, old, new, label):
     s = p.read_text()
     if new in s:
         return
+    # The incoming-link handler evolved in a later pass to support SEND_MULTIPLE.
+    # Treat that superset as already patched instead of failing on the older anchor.
+    if label == "Android incoming links" and "Intent.ACTION_SEND_MULTIPLE" in s and "Intent.ACTION_VIEW" in s:
+        return
     if old not in s:
         raise SystemExit(f"Patch anchor missing: {label} in {path}")
     p.write_text(s.replace(old, new, 1))
