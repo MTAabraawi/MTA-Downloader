@@ -1,6 +1,5 @@
 package com.example.data.extractor
 
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.schabi.newpipe.extractor.NewPipe
@@ -92,7 +91,7 @@ internal object NewPipeMediaProvider {
                     .forEach { stream ->
                         val mediaUrl = stream.content
                         if (mediaUrl.startsWith("https://", true)) {
-                            val format = stream.format
+                            val format = stream.format ?: return@forEach
                             add(
                                 com.example.data.model.QualityOption(
                                     id = "newpipe_video_${stream.resolution.lowercase().replace(Regex("[^a-z0-9]+"), "_")}_${format.suffix}",
@@ -128,7 +127,6 @@ internal object NewPipeMediaProvider {
             if (formats.isEmpty()) return null
             val title = customTitle?.takeIf { it.isNotBlank() } ?: extractor.name
             val uploader = extractor.uploaderName.takeIf { it.isNotBlank() } ?: service.serviceInfo.name
-            val thumb = runCatching { extractor.thumbnails.firstOrNull()?.url }.getOrNull()
             val firstStream = formats.first().overrideStreamUrl ?: return null
             com.example.data.model.VideoItem(
                 id = "newpipe_${url.hashCode()}",
