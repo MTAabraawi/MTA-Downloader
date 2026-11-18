@@ -415,7 +415,7 @@ edit("app/src/main/java/com/example/data/local/DownloadEntity.kt", lambda s: rep
 
 def database_migration(s):
     s = s.replace("import androidx.room.RoomDatabase\n",
-                  "import androidx.room.RoomDatabase\\nimport androidx.room.migration.Migration\\nimport androidx.sqlite.db.SupportSQLiteDatabase\\n")
+                  "import androidx.room.RoomDatabase\nimport androidx.room.migration.Migration\nimport androidx.sqlite.db.SupportSQLiteDatabase\n")
     s = s.replace("    version = 1,", "    version = 2,")
     s = s.replace("    companion object {\n", """    companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
