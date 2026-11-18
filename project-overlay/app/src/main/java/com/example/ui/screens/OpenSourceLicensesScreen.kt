@@ -41,6 +41,12 @@ fun OpenSourceLicensesScreen() {
                 .bufferedReader().use { it.readText() }
         }.getOrElse { "لم يتم العثور على إشعارات الغلاف داخل الأصول المدمجة." }
     }
+    val dependencySbom = remember {
+        runCatching {
+            context.assets.open("open-source-licenses/DEPENDENCY_SBOM.json")
+                .bufferedReader().use { it.readText() }
+        }.getOrElse { "لم يتم تضمين SBOM في هذا البناء؛ يجب استخدام بناء CI الذي يولد قائمة الاعتماديات." }
+    }
     var selectedDocument by remember { mutableStateOf<String?>(null) }
     var selectedTitle by remember { mutableStateOf("") }
 
@@ -94,6 +100,12 @@ fun OpenSourceLicensesScreen() {
             selectedDocument = wrapperNotices
         }) {
             Text("عرض إشعارات المكونات المضمنة")
+        }
+        OutlinedButton(onClick = {
+            selectedTitle = "قائمة مكونات البرنامج — CycloneDX SBOM"
+            selectedDocument = dependencySbom
+        }) {
+            Text("عرض قائمة الاعتماديات SBOM")
         }
         OutlinedButton(onClick = {
             uriHandler.openUri("https://github.com/MTAabraawi/MTA-Downloader")
