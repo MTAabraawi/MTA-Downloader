@@ -296,7 +296,7 @@ def ensure_repo_locale(s):
     if "Locale." in s and "import java.util.Locale" not in s:
         s = s.replace(
             "package com.example.data.repository",
-            "package com.example.data.repository\\n\\nimport java.util.Locale",
+            "package com.example.data.repository\n\nimport java.util.Locale",
             1
         )
     return s
