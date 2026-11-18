@@ -168,7 +168,7 @@ fun HomeScreen(
                     items(supportedSites, key = { it.id }) { site ->
                         Column(
                             modifier = Modifier.width(76.dp).clip(RoundedCornerShape(16.dp)).clickable { onSiteClick(site) }
-                                .padding(vertical = 7.dp).testTag("site_shortcut_\${site.id}"),
+                                .padding(vertical = 7.dp).testTag("site_shortcut_${site.id}"),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(7.dp)
                         ) {
@@ -207,7 +207,7 @@ fun HomeScreen(
                     TextButton(onClick = onOpenDownloadsClick) { Text("عرض الكل", color = MtaCyanGlow) }
                 }
             }
-            items(recentDownloads.take(4), key = { "recent_\${it.id}" }) { download ->
+            items(recentDownloads.take(4), key = { "recent_${it.id}" }) { download ->
                 RecentDownloadCard(download = download, onClick = onOpenDownloadsClick)
             }
         }
@@ -270,9 +270,9 @@ private fun RecentDownloadCard(download: DownloadEntity, onClick: () -> Unit) {
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(download.title, color = MtaTextPrimary, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("\${download.sourcePlatform} • $statusLabel", color = MtaTextSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${download.sourcePlatform} • $statusLabel", color = MtaTextSecondary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Text("\${download.progress.coerceIn(0, 100)}%", color = MtaCyanGlow, style = MaterialTheme.typography.labelMedium)
+                Text("${download.progress.coerceIn(0, 100)}%", color = MtaCyanGlow, style = MaterialTheme.typography.labelMedium)
             }
             if (status == DownloadStatus.DOWNLOADING || status == DownloadStatus.QUEUED) {
                 LinearProgressIndicator(
