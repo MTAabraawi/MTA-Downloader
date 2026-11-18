@@ -14,6 +14,7 @@ import okhttp3.Request
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
 import java.util.Properties
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -202,7 +203,7 @@ class SegmentedHttpDownloader(
                 emptySet()
             } else {
                 properties.getProperty("completed").orEmpty()
-                    .split(',').mapNotNull(String::toIntOrNull).filter { it in 0 until count }.toSet()
+                    .split(',').mapNotNull { it.toIntOrNull() }.filter { it in 0 until count }.toSet()
             }
         }.getOrElse {
             file.delete()
