@@ -468,14 +468,47 @@ def main_viewmodel_pause_resume(s):
 
 """
     s = replace_required(s, old, new, "MainViewModel pause and resume actions")
-    old_retry = """            mimeType = mimeType,
-            overrideStreamUrl = entity.sourceUrl
-        )"""
-    new_retry = """            mimeType = mimeType,
+    old_mime = """        val mimeType = when (extension) {
+            "mp3" -> "audio/mpeg"
+            "m4a" -> "audio/mp4"
+            "webm" -> "video/webm"
+            "mov" -> "video/quicktime"
+            "m4v" -> "video/x-m4v"
+            else -> "video/mp4"
+        }
+        val originalQuality = QualityOption(
+            id = "retry_original","""
+    new_mime = """        val mimeType = when (extension) {
+            "mp3" -> "audio/mpeg"
+            "m4a" -> "audio/mp4"
+            "webm" -> "video/webm"
+            "mov" -> "video/quicktime"
+            "m4v" -> "video/x-m4v"
+            "m3u8" -> "application/vnd.apple.mpegurl"
+            "mpd" -> "application/dash+xml"
+            "vtt" -> "text/vtt"
+            "srt" -> "application/x-subrip"
+            else -> "video/mp4"
+        }
+        val retryHeaders = downloadRepository.requestHeadersFor(entity)
+        val retryId = when {
+            entity.qualityLabel.contains("تنزيل الترجمات") -> "subtitles"
+            entity.format.contains("HLS", true) || entity.format.contains("DASH", true) -> "captured_manifest_retry"
+            entity.totalBytes > 0L || retryHeaders.isNotEmpty() || entity.qualityLabel.startsWith("ترجمة") -> "newpipe_retry"
+            else -> "retry_original"
+        }
+        val originalQuality = QualityOption(
+            id = retryId,"""
+    s = replace_required(s, old_mime, new_mime, "retry media kind and route")
+    old_headers = """            mimeType = mimeType,
             overrideStreamUrl = entity.sourceUrl,
             requestHeaders = downloadRepository.requestHeadersFor(entity)
         )"""
-    return replace_required(s, old_retry, new_retry, "retry request headers")
+    new_headers = """            mimeType = mimeType,
+            overrideStreamUrl = entity.sourceUrl,
+            requestHeaders = retryHeaders
+        )"""
+    return replace_required(s, old_headers, new_headers, "retry safe request headers")
 edit("app/src/main/java/com/example/ui/MainViewModel.kt", main_viewmodel_pause_resume)
 
 def main_activity_download_callbacks(s):
