@@ -87,6 +87,14 @@ dependencies {
   coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
   // On-device yt-dlp runtime. No advertising SDKs are included.
   implementation("dev.ffmpegkit-maintained:yt-dlp-android:2.0.2")
+  // Structured page fetching and HTML5-aware metadata extraction.
+  implementation("com.squareup.retrofit2:retrofit:3.0.0")
+  implementation("org.jsoup:jsoup:1.24.1")
+  // ExoPlayer via the actively maintained AndroidX Media3 stack.
+  implementation("androidx.media3:media3-exoplayer:1.11.1")
+  implementation("androidx.media3:media3-ui:1.11.1")
+  // LGPL-only FFmpegKit-compatible build; deliberately not a GPL codec variant.
+  implementation("dev.ffmpegkit-maintained:ffmpeg-kit-full:8.1.9")
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
