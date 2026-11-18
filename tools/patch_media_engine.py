@@ -1067,6 +1067,130 @@ def wire_ytdlp_planner(s):
     return s
 edit("app/src/main/java/com/example/data/repository/DownloadRepository.kt", wire_ytdlp_planner)
 
+
+# Add a visible, in-app open-source license page with the full bundled license texts.
+def license_route(s):
+    if "object OpenSourceLicensesRoute" not in s:
+        s += "\n@Serializable\nobject OpenSourceLicensesRoute\n"
+    return s
+edit("app/src/main/java/com/example/ui/navigation/MtaRoutes.kt", license_route)
+
+def license_strings(s):
+    if 'name="nav_licenses"' not in s:
+        s = s.replace("</resources>", '    <string name="nav_licenses">التراخيص</string>\n</resources>')
+    return s
+edit("app/src/main/res/values/strings.xml", license_strings)
+
+def license_navigation(s):
+    if "OpenSourceLicensesRoute" in s:
+        return s
+    s = s.replace(
+        "import androidx.compose.material.icons.filled.Language",
+        "import androidx.compose.material.icons.filled.Language\nimport androidx.compose.material.icons.filled.Info",
+        1
+    )
+    s = s.replace(
+        "import androidx.compose.material.icons.outlined.Language",
+        "import androidx.compose.material.icons.outlined.Language\nimport androidx.compose.material.icons.outlined.Info",
+        1
+    )
+    s = s.replace(
+        "import com.example.ui.navigation.DownloadsRoute",
+        "import com.example.ui.navigation.DownloadsRoute\nimport com.example.ui.navigation.OpenSourceLicensesRoute",
+        1
+    )
+    s = s.replace(
+        "import com.example.ui.screens.HomeScreen",
+        "import com.example.ui.screens.HomeScreen\nimport com.example.ui.screens.OpenSourceLicensesScreen",
+        1
+    )
+    s = s.replace(
+        "    val isDownloadsSelected = currentDestination?.hasRoute<DownloadsRoute>() == true",
+        "    val isDownloadsSelected = currentDestination?.hasRoute<DownloadsRoute>() == true\n    val isLicensesSelected = currentDestination?.hasRoute<OpenSourceLicensesRoute>() == true",
+        1
+    )
+    bottom_anchor = """                            modifier = Modifier.testTag("nav_downloads")
+                        )
+                    }
+                }
+            }
+        ) { innerPadding ->"""
+    bottom_insert = """                            modifier = Modifier.testTag("nav_downloads")
+                        )
+                        NavigationBarItem(
+                            selected = isLicensesSelected,
+                            onClick = { navigateTopLevel(OpenSourceLicensesRoute) },
+                            icon = {
+                                Icon(
+                                    imageVector = if (isLicensesSelected) Icons.Filled.Info else Icons.Outlined.Info,
+                                    contentDescription = stringResource(R.string.nav_licenses)
+                                )
+                            },
+                            label = { Text(stringResource(R.string.nav_licenses)) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MtaCyanGlow,
+                                selectedTextColor = MtaCyanGlow,
+                                indicatorColor = MtaNeonBlue.copy(alpha = 0.2f),
+                                unselectedIconColor = MtaTextSecondary,
+                                unselectedTextColor = MtaTextSecondary
+                            )
+                        )
+                    }
+                }
+            }
+        ) { innerPadding ->"""
+    s = replace_required(s, bottom_anchor, bottom_insert, "open-source licenses bottom navigation")
+    rail_anchor = """                            )
+                        )
+                    }
+                }
+
+                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {"""
+    rail_insert = """                            )
+                        )
+                        NavigationRailItem(
+                            selected = isLicensesSelected,
+                            onClick = { navigateTopLevel(OpenSourceLicensesRoute) },
+                            icon = {
+                                Icon(
+                                    imageVector = if (isLicensesSelected) Icons.Filled.Info else Icons.Outlined.Info,
+                                    contentDescription = stringResource(R.string.nav_licenses)
+                                )
+                            },
+                            label = { Text(stringResource(R.string.nav_licenses)) },
+                            colors = NavigationRailItemDefaults.colors(
+                                selectedIconColor = MtaCyanGlow,
+                                selectedTextColor = MtaCyanGlow,
+                                indicatorColor = MtaNeonBlue.copy(alpha = 0.22f),
+                                unselectedIconColor = MtaTextSecondary,
+                                unselectedTextColor = MtaTextSecondary
+                            )
+                        )
+                    }
+                }
+
+                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {"""
+    # Anchor is the closing of the rail's last item, not the bottom bar.
+    s = replace_required(s, rail_anchor, rail_insert, "open-source licenses navigation rail")
+    route_anchor = """                        composable<DownloadsRoute> {
+                            DownloadsScreen(
+                                downloads = downloads,
+                                onPlayDownloaded = viewModel::openDownloadedPlayer,
+                                onRetryDownload = viewModel::retryDownload,
+                                onDeleteDownload = viewModel::deleteDownload,
+                                onPauseDownload = viewModel::pauseDownload,
+                                onResumeDownload = viewModel::resumeDownload,
+                                onExploreVideosClick = { navigateTopLevel(HomeRoute) }
+                            )
+                        }"""
+    route_insert = route_anchor + """
+
+                        composable<OpenSourceLicensesRoute> {
+                            OpenSourceLicensesScreen()
+                        }"""
+    return replace_required(s, route_anchor, route_insert, "open-source licenses destination")
+edit("app/src/main/java/com/example/MainActivity.kt", license_navigation)
+
 # Verify the Android source no longer contains ad SDK IDs, permissions, callbacks, or libraries.
 scan_roots = [root / "app/src/main", root / "app/build.gradle.kts"]
 patterns = re.compile(r"StartApp|StartIo|Start\.io|210745939|AD_ID|onVideoCompleted|com\.startapp|rewarded.?ad", re.I)
