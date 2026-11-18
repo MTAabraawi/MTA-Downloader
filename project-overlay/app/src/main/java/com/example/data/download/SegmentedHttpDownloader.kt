@@ -20,6 +20,15 @@ import java.util.Properties
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
+private fun isPublicHost(host: String): Boolean = runCatching {
+    val normalized = host.lowercase().trimEnd('.')
+    if (normalized == "localhost" || normalized.endsWith(".localhost") || normalized.endsWith(".local")) return@runCatching false
+    InetAddress.getAllByName(normalized).all { address ->
+        !address.isAnyLocalAddress && !address.isLoopbackAddress && !address.isLinkLocalAddress &&
+            !address.isSiteLocalAddress && !address.isMulticastAddress
+    }
+}.getOrDefault(false)
+
 data class SegmentedDownloadProgress(
     val downloadedBytes: Long,
     val totalBytes: Long,
@@ -39,7 +48,8 @@ class SegmentedHttpDownloader(
         .retryOnConnectionFailure(true)
         .build(),
     private val segmentSize: Long = 8L * 1024L * 1024L,
-    private val parallelism: Int = 4
+    private val parallelism: Int = 4,
+    private val publicHostValidator: (String) -> Boolean = ::isPublicHost
 ) {
     suspend fun downloadIfResumable(
         url: String,
@@ -151,7 +161,7 @@ class SegmentedHttpDownloader(
                 }
                 check(response.isSuccessful) { "Media server returned HTTP ${response.code}" }
                 val finalUrl = response.request.url
-                check(finalUrl.isHttps && isPublicHost(finalUrl.host)) { "Redirect resolved to an insecure or private host" }
+                check(finalUrl.isHttps && publicHostValidator(finalUrl.host)) { "Redirect resolved to an insecure or private host" }
                 val contentType = response.header("Content-Type").orEmpty().substringBefore(';').trim()
                 check(!contentType.equals("text/html", true) && !contentType.contains("json", true)) {
                     "Media URL returned a page or JSON instead of media"
@@ -211,15 +221,6 @@ class SegmentedHttpDownloader(
             throw error
         } finally { cancellation?.dispose() }
     }
-
-    private fun isPublicHost(host: String): Boolean = runCatching {
-        val normalized = host.lowercase().trimEnd('.')
-        if (normalized == "localhost" || normalized.endsWith(".localhost") || normalized.endsWith(".local")) return@runCatching false
-        InetAddress.getAllByName(normalized).all { address ->
-            !address.isAnyLocalAddress && !address.isLoopbackAddress && !address.isLinkLocalAddress &&
-                !address.isSiteLocalAddress && !address.isMulticastAddress
-        }
-    }.getOrDefault(false)
 
     private data class Probe(
         val total: Long,
