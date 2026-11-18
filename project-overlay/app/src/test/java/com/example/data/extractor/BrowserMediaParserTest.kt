@@ -34,6 +34,10 @@ class BrowserMediaParserTest {
         assertNull(BrowserMediaParser.parse("http://cdn.example/video.mp4"))
         assertNull(BrowserMediaParser.parse("https://user:pass@cdn.example/video.mp4"))
         assertNull(BrowserMediaParser.parse("https://localhost/video.mp4"))
+        assertNull(BrowserMediaParser.parse("https://172.16.0.8/video.mp4"))
+        assertNull(BrowserMediaParser.parse("https://100.64.0.1/video.mp4"))
+        assertNull(BrowserMediaParser.parse("https://[::1]/video.mp4"))
+        assertNull(BrowserMediaParser.parse("https://[fd00::1]/video.mp4"))
         assertNull(BrowserMediaParser.parse("https://cdn.example/page"))
     }
 }
