@@ -94,7 +94,11 @@ def app(s):
             .init()
         StartAppAd.disableSplash()
 """
-    s = replace_required(s, block, "", "Start.io application initialization")
+    if block in s:
+        s = s.replace(block, "", 1)
+    elif "StartAppSDK" in s or "StartAppAd" in s:
+        raise SystemExit("Unrecognized Start.io initialization remains; refusing unsafe partial removal.")
+    # The clean overlay already removes Start.io initialization, so absence is expected.
     s = re.sub(r"\n    companion object \{\n        const val STARTIO_APP_ID = \"210745939\"\n    \}\n", "\n", s)
     return s
 edit("app/src/main/java/com/example/MTADownloaderApp.kt", app)
