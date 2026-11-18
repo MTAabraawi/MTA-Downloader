@@ -8,6 +8,7 @@ on:
       - 'project-overlay/**'
       - 'tools/apply_adfree_redesign.py'
       - 'tools/patch_media_engine.py'
+      - 'tools/patch_runtime_stack.py'
       - 'tools/audit_sbom.py'
       - 'tools/inspect_embedded_python.py'
       - 'tools/package_corresponding_source.sh'
@@ -64,6 +65,7 @@ jobs:
           sed -n '1,260p' project/app/src/main/java/com/example/data/model/VideoModels.kt
           sed -n '1,240p' project/app/src/main/java/com/example/data/local/DownloadEntity.kt
           python3 tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt
+          python3 tools/patch_runtime_stack.py project
       - name: Enforce ad-free source invariant
         run: |
           set -euo pipefail
