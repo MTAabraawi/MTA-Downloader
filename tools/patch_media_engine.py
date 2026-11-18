@@ -84,14 +84,14 @@ configure_jitpack()
 # Avoid unstable Gradle configuration-cache serialization in the archived Android project.
 gradle_properties = root / "gradle.properties"
 gradle_text = gradle_properties.read_text(encoding="utf-8") if gradle_properties.exists() else ""
-if re.search(r"(?m)^\\s*org\\.gradle\\.configuration-cache=", gradle_text):
+if re.search(r"(?m)^\s*org\.gradle\.configuration-cache=", gradle_text):
     gradle_text = re.sub(
-        r"(?m)^\\s*org\\.gradle\\.configuration-cache=.*$",
+        r"(?m)^\s*org\.gradle\.configuration-cache=.*$",
         "org.gradle.configuration-cache=false",
         gradle_text
     )
 else:
-    gradle_text = gradle_text.rstrip() + "\\norg.gradle.configuration-cache=false\\n"
+    gradle_text = gradle_text.rstrip() + "\norg.gradle.configuration-cache=false\n"
 gradle_properties.write_text(gradle_text, encoding="utf-8")
 
 anchor = """            MediaExtractionResult.NeedsSmartBrowser(
