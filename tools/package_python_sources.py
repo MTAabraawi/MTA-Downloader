@@ -17,6 +17,12 @@ def main():
 
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     packages = manifest.get("python_distributions", []) if isinstance(manifest, dict) else manifest
+    version_hints = manifest.get("version_hints_from_sources", {}) if isinstance(manifest, dict) else {}
+    known_names = {package.get("name", "").lower().replace("_", "-").replace(".", "-") for package in packages}
+    for name, version in version_hints.items():
+        normalized = name.lower().replace("_", "-").replace(".", "-")
+        if normalized not in known_names and version:
+            packages.append({"name": normalized, "version": version})
     wanted = {"yt-dlp", "certifi"}
     found = set()
     args.output.mkdir(parents=True, exist_ok=True)
