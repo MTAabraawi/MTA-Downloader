@@ -494,8 +494,8 @@ def downloads_screen_pause_resume(s):
         """    onDeleteDownload: (DownloadEntity) -> Unit,
     onExploreVideosClick: () -> Unit,""",
         """    onDeleteDownload: (DownloadEntity) -> Unit,
-    onPauseDownload: (DownloadEntity) -> Unit,
-    onResumeDownload: (DownloadEntity) -> Unit,
+    onPauseDownload: (DownloadEntity) -> Unit = {},
+    onResumeDownload: (DownloadEntity) -> Unit = {},
     onExploreVideosClick: () -> Unit,"""
     )
     s = s.replace(
