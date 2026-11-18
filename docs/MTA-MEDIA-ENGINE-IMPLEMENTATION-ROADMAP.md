@@ -18,7 +18,7 @@ The requested upstream projects are not all drop-in Android libraries.
 
 The Android wrapper commonly used with yt-dlp (yausername/youtubedl-android) is also GPL-3.0 and bundles Python/native components. A different MIT-licensed wrapper exists, but its published architecture bundles a 60–80 MB Python runtime and has a materially larger ABI footprint; it needs independent security, provenance, and license review before use.
 
-**Do not copy or link GPL components into the existing app until the owner explicitly chooses a GPL-compatible distribution model and agrees to publish the corresponding source and notices.** This is a distribution/licensing decision, not a technical build detail.
+**Owner approval recorded (2026-11-18):** the owner approved distributing MTA Downloader under GPL-3.0-compatible terms and publishing the corresponding source and notices. This approval permits proceeding with the licensing migration, subject to preserving third-party notices and separately reviewing every bundled component.
 
 ## Proposed MTA architecture
 
