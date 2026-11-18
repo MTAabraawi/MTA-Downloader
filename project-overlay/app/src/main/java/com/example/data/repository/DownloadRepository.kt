@@ -32,6 +32,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 class DownloadRepository(
     private val context: Context,
@@ -40,6 +42,7 @@ class DownloadRepository(
     private val segmentedDownloader by lazy { SegmentedHttpDownloader() }
     private val segmentedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val segmentedJobs = ConcurrentHashMap<Long, Deferred<File?>>()
+    private val segmentedSemaphore = Semaphore(2)
 
     private val downloadManager: DownloadManager by lazy {
         context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
@@ -105,24 +108,28 @@ class DownloadRepository(
             val segmentedTarget = File(segmentedDirectory, fileName)
             val progressScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             val lastProgressAt = AtomicLong(0L)
+            downloadDao.update(trackedEntity.copy(status = DownloadStatus.QUEUED.name))
             val segmentedTask = segmentedScope.async {
-                segmentedDownloader.downloadIfResumable(
-                    targetStreamUrl,
-                    segmentedTarget,
-                    headers = safeRequestHeaders(quality.requestHeaders)
-                ) { progress ->
-                    val now = System.currentTimeMillis()
-                    if (now - lastProgressAt.get() >= 800L && lastProgressAt.getAndSet(now) <= now) {
-                        progressScope.launch {
-                            downloadDao.update(
-                                trackedEntity.copy(
-                                    progress = if (progress.totalBytes > 0L)
-                                        ((progress.downloadedBytes * 100L) / progress.totalBytes).toInt().coerceIn(0, 99)
-                                    else 0,
-                                    downloadedBytes = progress.downloadedBytes,
-                                    totalBytes = progress.totalBytes
+                segmentedSemaphore.withPermit {
+                    downloadDao.update(trackedEntity.copy(status = DownloadStatus.DOWNLOADING.name))
+                    segmentedDownloader.downloadIfResumable(
+                        targetStreamUrl,
+                        segmentedTarget,
+                        headers = safeRequestHeaders(quality.requestHeaders)
+                    ) { progress ->
+                        val now = System.currentTimeMillis()
+                        if (now - lastProgressAt.get() >= 800L && lastProgressAt.getAndSet(now) <= now) {
+                            progressScope.launch {
+                                downloadDao.update(
+                                    trackedEntity.copy(
+                                        progress = if (progress.totalBytes > 0L)
+                                            ((progress.downloadedBytes * 100L) / progress.totalBytes).toInt().coerceIn(0, 99)
+                                        else 0,
+                                        downloadedBytes = progress.downloadedBytes,
+                                        totalBytes = progress.totalBytes
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                 }
