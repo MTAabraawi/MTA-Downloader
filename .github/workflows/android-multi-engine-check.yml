@@ -9,6 +9,7 @@ on:
       - 'tools/apply_adfree_redesign.py'
       - 'tools/patch_media_engine.py'
       - 'tools/patch_runtime_stack.py'
+      - 'tools/patch_share_format_chooser.py'
       - 'tools/audit_sbom.py'
       - 'tools/inspect_embedded_python.py'
       - 'tools/test_inspect_embedded_python.py'
@@ -68,6 +69,7 @@ jobs:
           sed -n '1,240p' project/app/src/main/java/com/example/data/local/DownloadEntity.kt
           python3 tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt
           python3 tools/patch_runtime_stack.py project
+          python3 tools/patch_share_format_chooser.py project
           python3 -m unittest discover -s tools -p 'test_*.py' -v
       - name: Enforce ad-free source invariant
         run: |
@@ -97,8 +99,6 @@ jobs:
           gradle --no-daemon --no-configuration-cache :app:dependencyInsight --dependency NewPipeExtractor --configuration debugRuntimeClasspath > app/build/reports/newpipe-dependency-insight.txt
           python3 ../tools/inspect_embedded_python.py --gradle-cache "$HOME/.gradle/caches" --output build/reports/embedded-python-packages.json
           mkdir -p app/src/main/assets/open-source-licenses
-          # Ship the repository's complete third-party notice as a root-level APK asset.
-          # The audit checks the packaged APK, not merely the source repository.
           test -s ../THIRD-PARTY-NOTICES.md
           cp ../THIRD-PARTY-NOTICES.md app/src/main/assets/THIRD-PARTY-NOTICES.txt
           cp build/reports/cyclonedx/bom.json app/src/main/assets/open-source-licenses/DEPENDENCY_SBOM.json
