@@ -7,6 +7,7 @@ on:
       - 'project-overlay/**'
       - 'tools/patch_media_engine.py'
       - 'tools/patch_runtime_stack.py'
+      - 'tools/patch_share_format_chooser.py'
       - '.github/workflows/android-release.yml'
   pull_request:
     branches: [main, feature/multi-engine-adfree]
@@ -50,20 +51,19 @@ jobs:
           cp -a project-overlay/. project/
           python3 tools/patch_media_engine.py project/app/src/main/java/com/example/data/extractor/MediaExtractorEngine.kt
           python3 tools/patch_runtime_stack.py project
+          python3 tools/patch_share_format_chooser.py project
           python3 -m unittest discover -s tools -p 'test_*.py' -v
           if grep -RInE 'StartApp|StartIo|Start\.io|210745939|AD_ID|com\.startapp|rewarded.?ad|RewardDownloadConfirmDialog|rewardDialogState|enqueueDownloadAfterReward' project/app/src/main project/app/build.gradle.kts; then
             echo "::error::Advertising code or SDK detected in release source"
             exit 1
           fi
           grep -q 'mediaProcessingEngine.mergeFiles(video, audio, output)' project/app/src/main/java/com/example/data/repository/DownloadRepository.kt
-          # Normalize harmless whitespace/newlines, then strictly decode without printing the secret.
           python3 - <<'PY'
           import base64
           import os
           import re
           import sys
           encoded = re.sub(r"\s+", "", os.environ["KEYSTORE_BASE64"])
-          # Accept both standard and URL-safe Base64, including omitted trailing padding.
           encoded = encoded.replace("-", "+").replace("_", "/")
           encoded += "=" * (-len(encoded) % 4)
           try:
@@ -79,9 +79,7 @@ jobs:
           PY
           chmod 600 project/my-upload-key.jks
           test -s project/my-upload-key.jks
-          # Confirm the decoded file is a readable keystore and contains the expected upload alias.
           keytool -list -keystore project/my-upload-key.jks -storepass "$STORE_PASSWORD" -alias upload >/dev/null
-          # Verify the private-key password too, before spending time on Gradle/emulator builds.
           keytool -certreq -keystore project/my-upload-key.jks -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" -alias upload -file "$RUNNER_TEMP/mta-upload-key-check.csr" >/dev/null
           rm -f "$RUNNER_TEMP/mta-upload-key-check.csr"
           echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/project/my-upload-key.jks" >> "$GITHUB_ENV"
