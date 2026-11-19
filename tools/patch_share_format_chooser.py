@@ -57,8 +57,7 @@ if new_outer not in source:
     source = source.replace(old_outer, new_outer, 1)
 
 start = source.find('                Text(\n                    text = "اختر الجودة والمسار المستخرج:",')
-end_marker = """                }
-            }
+end_marker = """            }
         },
         confirmButton = {"""
 end = source.find(end_marker, start)
